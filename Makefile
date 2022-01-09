@@ -7,7 +7,4 @@ PROJECT_NAME := WaterRowerLinkPlus
 
 COMPONENT_ADD_INCLUDEDIRS := components/include
 
-set(ENV{EXTRA_CXXFLAGS} -Wmissing-field-initializers -Werror=switch)
-
 include $(IDF_PATH)/make/project.mk
-

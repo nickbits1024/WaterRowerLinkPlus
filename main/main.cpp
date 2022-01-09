@@ -38,7 +38,7 @@
 #define WATERROWER_APP_ID           0x55
 //#define BIKE_APP_ID                 0x57
 //#define HR_APP_ID                   0x58
-#define WATERROWER_DEVICE_NAME      "WaterRower"
+#define WATERROWER_DEVICE_NAME      "WaterRowerLink+"
 #define CSC_SVC_INST_ID             0
 #define FTMS_SVC_INST_ID            1
 #define HR_SVC_INST_ID              2
@@ -51,7 +51,7 @@
 #define CHAR_DECLARATION_SIZE       (sizeof(uint8_t))
 
 #define ADV_CONFIG_FLAG             (1 << 0)
-//#define SCAN_RSP_CONFIG_FLAG        (1 << 1)
+#define SCAN_RSP_CONFIG_FLAG        (1 << 1)
 
 static uint8_t adv_config_done = 0;
 
@@ -71,25 +71,26 @@ static uint8_t raw_adv_data[] = {
     /* flags */
     0x02, 0x01, 0x06,
     /* tx power*/
-    0x02, 0x0a, 0xeb,
+    //0x02, 0x0a, 0xeb,
     /* service uuid */
     0x07, 0x03, 0x16, 0x18, 0x0d, 0x18, 0x26, 0x18,
     /* device name */
-    0x0b, 0x09, 'W', 'a', 't', 'e', 'r', 'R', 'o', 'w', 'e', 'r',
+    0x05, 0x09, 'W', 'R', 'L', '+', 
     /* ftms service data rower+indoor bike*/
-    0x06, 0x16, 0x26, 0x18, 0x01, 0b00001100, 0b00000000
+    0x06, 0x16, 0x26, 0x18, 0x01, 0b00001100, 0b00000000,
+    /* manufactuer data */
+    0x05, 0xff,0xff, 0xff, 0x77, 0x72
 };
 
-#if 0
 static uint8_t raw_scan_rsp_data[] = {
     /* flags */
     0x02, 0x01, 0x06,
     /* tx power */
     0x02, 0x0a, 0xeb,
     /* service uuid */
-    0x05, 0x03, 0x16, 0x18, 0x0d, 0x18
+    //0x05, 0x03, 0x16, 0x18, 0x0d, 0x18
+    //0x0f, 0x09, 'W', 'a', 't', 'e', 'r', 'R', 'o', 'w', 'e', 'r', 'L', 'i', 'n', 'k', '+', 
 };
-#endif
 
 static esp_ble_adv_params_t adv_params = {
     .adv_int_min = 0x20,
@@ -187,7 +188,7 @@ static const esp_gatts_attr_db_t gatt_ftms_db[FTMS_IDX_NB] =
 
     // FTMS Feature Value
     [IDX_FTMS_FEATURE_VAL] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&csc_feature_uuid, ESP_GATT_PERM_READ,
+        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&ftms_feature_uuid, ESP_GATT_PERM_READ,
         GATTS_DEMO_CHAR_VAL_LEN_MAX, sizeof(ftms_feature_value), (uint8_t*)ftms_feature_value}},
 
     // Rower Data
@@ -492,12 +493,91 @@ void notify_hr_measurement(void* p)
         esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
         if (ret != ESP_OK)
         {
-            ESP_LOGI(WATERROWER_TAG, "HR notify error %08x", ret);
+            ESP_LOGI(WATERROWER_TAG, "HR notify error (%d)", ret);
             vTaskDelete(NULL);
         }
 
 
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+#define FTMS_DATA_MORE_DATA       0b0000000000000001
+#define FTMS_CADENCE              0b0000000000000010
+#define FTMS_TOTAL_DISTANCE       0b0000000000000100
+#define FTMS_CURRENT_PACE         0b0000000000001000
+#define FTMS_AVG_PACE             0b0000000000010000
+#define FTMS_CURRENT_POWER        0b0000000000100000
+#define FTMS_AVG_POWER            0b0000000001000000
+#define FTMS_RESISTANCE_LEVEL     0b0000000010000000
+
+#define FTMS_EXPENDED_ENERGY      0b0000000100000000
+#define FTMS_HEART_RATE           0b0000001000000000
+#define FTMS_META_EQU             0b0000010000000000
+#define FTMS_ELASPED_TIME         0b0000100000000000
+#define FTMS_REMAINING_TIME       0b0001000000000000
+
+void notify_ftms_rower_data(void* p)
+{
+    uint16_t stroke_rate = 22 * 2;
+    uint16_t total_strokes = 0;
+    uint32_t total_distance = 0;
+    uint16_t pace = 130;
+    uint16_t watts = 100;
+    uint16_t total_cal = 55;
+    uint16_t cal_hour = 1000;
+    uint16_t cal_min = 22;
+    uint8_t heart_rate = 88;
+    uint16_t elapsed;
+
+    esp_gatt_if_t gatts_if = ((intptr_t)p) >> 16;
+    uint16_t conn_id = ((intptr_t)p) & 0xffff;
+
+    int64_t start = esp_timer_get_time();
+
+    for (;;)
+    {
+
+        elapsed = (uint16_t)((esp_timer_get_time() - start) / 1000000ul);
+
+        uint8_t rower_data_value[20];
+
+        rower_data_value[0] = FTMS_TOTAL_DISTANCE | FTMS_CURRENT_PACE | FTMS_CURRENT_POWER;
+        rower_data_value[1] = (FTMS_EXPENDED_ENERGY | FTMS_HEART_RATE | FTMS_ELASPED_TIME) >> 8;
+        rower_data_value[2] = stroke_rate & 0xff;
+        rower_data_value[3] = total_strokes & 0xff;
+        rower_data_value[4] = (total_strokes >> 8) & 0xff;
+        rower_data_value[5] = total_distance & 0xff;
+        rower_data_value[6] = (total_distance >> 8) & 0xff;
+        rower_data_value[7] = (total_distance >> 16) & 0xff;
+        rower_data_value[8] = pace & 0xff;
+        rower_data_value[9] = (pace >> 8) & 0xff;
+        rower_data_value[10] = watts & 0xff;
+        rower_data_value[11] = (watts >> 8) & 0xff;
+        rower_data_value[12] = total_cal & 0xff;
+        rower_data_value[13] = (total_cal >> 8) & 0xff;
+        rower_data_value[14] = cal_hour & 0xff;
+        rower_data_value[15] = (cal_hour >> 8) & 0xff;
+        rower_data_value[16] = cal_min & 0xff;
+        rower_data_value[17] = heart_rate & 0xff;
+        rower_data_value[18] = elapsed & 0xff;
+        rower_data_value[19] = (elapsed >> 8) & 0xff;
+
+        ESP_LOGI(WATERROWER_TAG, "gatts_if: %u conn_id: %u spm %d strokes %d", gatts_if, conn_id, stroke_rate, total_strokes);
+        esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value), rower_data_value, false);
+        if (ret != ESP_OK)
+        {
+            ESP_LOGI(WATERROWER_TAG, "FTMS rower data notify error (%d)", ret);
+            vTaskDelete(NULL);
+        }
+
+
+        total_strokes++;
+        total_cal++;
+
+        total_distance += 100;
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -552,7 +632,7 @@ void notify_csc_measurement(void* p)
             esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, csc_handle_table[IDX_CSC_MEASUREMENT_VAL], sizeof(csc_measurement_value), csc_measurement_value, false);
             if (ret != ESP_OK)
             {
-                ESP_LOGI(WATERROWER_TAG, "CSC notify error %08x", ret);
+                ESP_LOGI(WATERROWER_TAG, "CSC notify error (%d)", ret);
                 vTaskDelete(NULL);
             }
 
@@ -570,7 +650,7 @@ void notify_csc_measurement(void* p)
             last_now = now;
         }
 
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -598,7 +678,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             // }
             // adv_config_done |= SCAN_RSP_CONFIG_FLAG;
             ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_csc_db, gatts_if, CSC_IDX_NB, CSC_SVC_INST_ID));
-            //ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_ftms_db, gatts_if, FTMS_IDX_NB, FTMS_SVC_INST_ID));
+            ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_ftms_db, gatts_if, FTMS_IDX_NB, FTMS_SVC_INST_ID));
             ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_hr_db, gatts_if, HR_IDX_NB, HR_SVC_INST_ID));
             break;
         }
@@ -613,20 +693,44 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 esp_log_buffer_hex(WATERROWER_TAG, param->write.value, param->write.len);
                 if (csc_handle_table[IDX_CSC_MEASUREMENT_CFG] == param->write.handle && param->write.len == 2)
                 {
+                    ESP_LOGI(WATERROWER_TAG, "start CSC notify");
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
                         uintptr_t p = gatts_if << 16 | param->write.conn_id;
                         xTaskCreate(notify_csc_measurement, "notify_csc_measurement", 8000, (void*)p, 1, NULL);
                     }
+                    else
+                    {
+                        ESP_LOGI(WATERROWER_TAG, "kill csc notify %u %u", gatts_if, param->write.conn_id);
+                    }
                 }
                 else if (hr_handle_table[IDX_HR_MEASUREMENT_CFG] == param->write.handle && param->write.len == 2)
                 {
+                    ESP_LOGI(WATERROWER_TAG, "start HR notify");
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
                         uintptr_t p = gatts_if << 16 | param->write.conn_id;
                         xTaskCreate(notify_hr_measurement, "notify_hr_measurement", 8000, (void*)p, 1, NULL);
+                    }
+                    else
+                    {
+                        ESP_LOGI(WATERROWER_TAG, "kill hr notify %u %u", gatts_if, param->write.conn_id);
+                    }
+                }
+                else if (ftms_handle_table[IDX_FTMS_ROWER_DATA_CFG] == param->write.handle && param->write.len == 2)
+                {
+                    ESP_LOGI(WATERROWER_TAG, "start rower data notify");
+                    uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
+                    if ((descr_value & 1) == 1)
+                    {
+                        uintptr_t p = gatts_if << 16 | param->write.conn_id;
+                        xTaskCreate(notify_ftms_rower_data, "notify_rower_data", 8000, (void*)p, 1, NULL);
+                    }
+                    else
+                    {
+                        ESP_LOGI(WATERROWER_TAG, "kill rower data notify %u %u", gatts_if, param->write.conn_id);
                     }
                 }
                 // if (heart_rate_handle_table[IDX_CHAR_CFG_A] == param->write.handle && param->write.len == 2){
