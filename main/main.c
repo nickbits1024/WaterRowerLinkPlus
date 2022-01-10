@@ -76,8 +76,10 @@ static uint8_t raw_adv_data[] = {
     0x07, 0x03, 0x16, 0x18, 0x0d, 0x18, 0x26, 0x18,
     /* device name */
     0x05, 0x09, 'W', 'R', 'L', '+', 
-    /* ftms service data rower+indoor bike*/
-    0x06, 0x16, 0x26, 0x18, 0x01, 0b00001100, 0b00000000,
+    /* ftms service data rower*/
+    //0x06, 0x16, 0x26, 0x18, 0x01, 0b00110000, 0b00000000,
+    /* ftms service rower*/
+    0x06, 0x16, 0x26, 0x18, 0x01, 0b00010000, 0b00000000,
     /* manufactuer data */
     0x05, 0xff,0xff, 0xff, 0x77, 0x72
 };
@@ -144,7 +146,7 @@ static const uint16_t hr_control_point_uuid = ESP_GATT_HEART_RATE_CNTL_POINT;
 static const uint16_t ftms_svc_uuid = 0x1826;
 static const uint16_t ftms_feature_uuid = 0x2acc;
 static const uint16_t ftms_rower_data_uuid = 0x2ad1;
-static const uint16_t ftms_indoor_bike_data_uuid = 0x2ad2;
+//static const uint16_t ftms_indoor_bike_data_uuid = 0x2ad2;
 static const uint16_t ftms_control_point_uuid = 0x2ad9;
 
 static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
@@ -167,6 +169,7 @@ static const uint8_t hr_body_sensor_location_value[1] = { 0x00 };
 //static const uint8_t hr_control_point_value[1] = { 0x00 };
 
 static const uint8_t ftms_rower_data_ccc[2] = { 0x00, 0x00 };
+//static const uint8_t ftms_indoor_bike_data_ccc[2] = { 0x00, 0x00 };
                                                                       
 static const uint8_t ftms_feature_value[8] = 
 {
@@ -201,10 +204,20 @@ static const esp_gatts_attr_db_t gatt_ftms_db[FTMS_IDX_NB] =
         {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&ftms_rower_data_uuid, 0,
         sizeof(uint16_t), 0, NULL}},
 
-    // Rower Data Config
-    [IDX_FTMS_ROWER_DATA_CFG] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-        sizeof(uint16_t), sizeof(ftms_rower_data_ccc), (uint8_t*)ftms_rower_data_ccc}},
+    // // Indoor Bike Data
+    // [IDX_FTMS_INDOOR_BIKE_DATA] =
+    //     {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
+    //     CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_notify}},
+
+    // // Indoor Bike Value
+    // [IDX_FTMS_INDOOR_BIKE_DATA_VAL] =
+    //     {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&ftms_indoor_bike_data_uuid, 0,
+    //     sizeof(uint16_t), 0, NULL}},
+
+    // // Indoor Bike Config
+    // [IDX_FTMS_INDOOR_BIKE_DATA_CFG] =
+    //     {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+    //     sizeof(uint16_t), sizeof(ftms_indoor_bike_data_ccc), (uint8_t*)ftms_indoor_bike_data_ccc}},
 
     // FTMS Control Point
     [IDX_FTMS_CONTROL_POINT] =
@@ -733,36 +746,19 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                         ESP_LOGI(WATERROWER_TAG, "kill rower data notify %u %u", gatts_if, param->write.conn_id);
                     }
                 }
-                // if (heart_rate_handle_table[IDX_CHAR_CFG_A] == param->write.handle && param->write.len == 2){
-                //     uint16_t descr_value = param->write.value[1]<<8 | param->write.value[0];
-                //     if (descr_value == 0x0001){
-                //         ESP_LOGI(WATERROWER_TAG, "notify enable");
-                //         uint8_t notify_data[15];
-                //         for (int i = 0; i < sizeof(notify_data); ++i)
-                //         {
-                //             notify_data[i] = i % 0xff;
-                //         }
-                //         //the size of notify_data[] need less than MTU size
-                //         esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, heart_rate_handle_table[IDX_CHAR_VAL_A],
-                //                                 sizeof(notify_data), notify_data, false);
-                //     }else if (descr_value == 0x0002){
-                //         ESP_LOGI(WATERROWER_TAG, "indicate enable");
-                //         uint8_t indicate_data[15];
-                //         for (int i = 0; i < sizeof(indicate_data); ++i)
-                //         {
-                //             indicate_data[i] = i % 0xff;
-                //         }
-                //         //the size of indicate_data[] need less than MTU size
-                //         esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id, heart_rate_handle_table[IDX_CHAR_VAL_A],
-                //                             sizeof(indicate_data), indicate_data, true);
+                // else if (ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_CFG] == param->write.handle && param->write.len == 2)
+                // {
+                //     ESP_LOGI(WATERROWER_TAG, "start indoor bike data notify");
+                //     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
+                //     if ((descr_value & 1) == 1)
+                //     {
+                //         uintptr_t p = gatts_if << 16 | param->write.conn_id;
+                //         xTaskCreate(notify_ftms_rower_data, "notify_indoor_bike_data", 8000, (void*)p, 1, NULL);
                 //     }
-                //     else if (descr_value == 0x0000){
-                //         ESP_LOGI(WATERROWER_TAG, "notify/indicate disable ");
-                //     }else{
-                //         ESP_LOGE(WATERROWER_TAG, "unknown descr value");
-                //         esp_log_buffer_hex(WATERROWER_TAG, param->write.value, param->write.len);
+                //     else
+                //     {
+                //         ESP_LOGI(WATERROWER_TAG, "kill indoor bike data notify %u %u", gatts_if, param->write.conn_id);
                 //     }
-
                 // }
                 /* send response when param->write.need_rsp is true*/
                 if (param->write.need_rsp)
@@ -885,7 +881,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 }
 #endif
 
-extern "C"
+//extern "C"
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -895,11 +891,18 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
 
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+    //ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+
+    void* p = malloc(200);
+    if (p == NULL)
+    {
+        ESP_LOGE(WATERROWER_TAG, "NO MEMORY");
+    }
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    ESP_LOGI(WATERROWER_TAG, "sizeof(bt_cfg) = %d magic = %x", sizeof(bt_cfg), bt_cfg.magic);
     ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
-
+    ESP_LOGI(WATERROWER_TAG, "2");
     ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
     ESP_ERROR_CHECK(esp_bluedroid_init());
     ESP_ERROR_CHECK(esp_bluedroid_enable());
@@ -907,7 +910,5 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_profile_event_handler));
     ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));
     ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_APP_ID));
-    //ESP_ERROR_CHECK(esp_ble_gatts_app_register(BIKE_APP_ID));
-    //ESP_ERROR_CHECK(esp_ble_gatts_app_register(HR_APP_ID));
     ESP_ERROR_CHECK(esp_ble_gatt_set_local_mtu(500));
 }

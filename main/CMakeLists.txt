@@ -1,5 +1,5 @@
 
-idf_component_register(SRCS "main.cpp"
+idf_component_register(SRCS "main.c"
                     INCLUDE_DIRS ".")
 
 target_compile_options(${COMPONENT_LIB} PRIVATE "-Wno-missing-field-initializers" "-Wno-switch" "-Wno-unused-variable")
