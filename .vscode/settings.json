@@ -6,6 +6,14 @@
         "board/esp32s3-builtin.cfg"
     ],
     "files.associations": {
-        "esp_bt.h": "c"
+        "esp_bt.h": "c",
+        "gpio.h": "c",
+        "usb_host.h": "c",
+        "esp_log.h": "c",
+        "task.h": "c",
+        "complex": "c",
+        "format": "c",
+        "xmemory": "c",
+        "*.inc": "c"
     }
 }

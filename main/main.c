@@ -29,9 +29,11 @@
 #include "esp_gatts_api.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
+#include "usb.h"
+#include "waterrower.h"
 #include "main.h"
 
-#define WATERROWER_TAG "WATERROWER"
+#define WATERROWER_TAG "main"
 
 #define PROFILE_NUM                 1
 #define PROFILE_APP_IDX             0
@@ -891,24 +893,17 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
 
-    //ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+    ESP_ERROR_CHECK(usb_init());
+    ESP_ERROR_CHECK(waterrower_init());
 
-    void* p = malloc(200);
-    if (p == NULL)
-    {
-        ESP_LOGE(WATERROWER_TAG, "NO MEMORY");
-    }
-
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ESP_LOGI(WATERROWER_TAG, "sizeof(bt_cfg) = %d magic = %x", sizeof(bt_cfg), bt_cfg.magic);
-    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
-    ESP_LOGI(WATERROWER_TAG, "2");
-    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
-    ESP_ERROR_CHECK(esp_bluedroid_init());
-    ESP_ERROR_CHECK(esp_bluedroid_enable());
-    //ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_event_handler));
-    ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_profile_event_handler));
-    ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));
-    ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_APP_ID));
-    ESP_ERROR_CHECK(esp_ble_gatt_set_local_mtu(500));
+    // esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    // ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
+    // ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
+    // ESP_ERROR_CHECK(esp_bluedroid_init());
+    // ESP_ERROR_CHECK(esp_bluedroid_enable());
+    // //ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_event_handler));
+    // ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_profile_event_handler));
+    // ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));
+    // ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_APP_ID));
+    // ESP_ERROR_CHECK(esp_ble_gatt_set_local_mtu(500));
 }
