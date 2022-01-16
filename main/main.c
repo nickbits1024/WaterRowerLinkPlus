@@ -33,7 +33,7 @@
 #include "waterrower.h"
 #include "main.h"
 
-#define WATERROWER_TAG "main"
+#define TAG "main"
 
 #define PROFILE_NUM                 1
 #define PROFILE_APP_IDX             0
@@ -349,25 +349,25 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
             /* advertising start complete event to indicate advertising start successfully or failed */
             if (param->adv_start_cmpl.status != ESP_BT_STATUS_SUCCESS)
             {
-                ESP_LOGE(WATERROWER_TAG, "advertising start failed");
+                ESP_LOGE(TAG, "advertising start failed");
             }
             else
             {
-                ESP_LOGI(WATERROWER_TAG, "advertising start successfully");
+                ESP_LOGI(TAG, "advertising start successfully");
             }
             break;
         case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
             if (param->adv_stop_cmpl.status != ESP_BT_STATUS_SUCCESS)
             {
-                ESP_LOGE(WATERROWER_TAG, "Advertising stop failed");
+                ESP_LOGE(TAG, "Advertising stop failed");
             }
             else
             {
-                ESP_LOGI(WATERROWER_TAG, "Stop adv successfully\n");
+                ESP_LOGI(TAG, "Stop adv successfully\n");
             }
             break;
         case ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT:
-            ESP_LOGI(WATERROWER_TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
+            ESP_LOGI(TAG, "update connection params status = %d, min_int = %d, max_int = %d,conn_int = %d,latency = %d, timeout = %d",
                 param->update_conn_params.status,
                 param->update_conn_params.min_int,
                 param->update_conn_params.max_int,
@@ -382,7 +382,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 
 void example_prepare_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t* prepare_write_env, esp_ble_gatts_cb_param_t* param)
 {
-    ESP_LOGI(WATERROWER_TAG, "prepare write, handle = %d, value len = %d", param->write.handle, param->write.len);
+    ESP_LOGI(TAG, "prepare write, handle = %d, value len = %d", param->write.handle, param->write.len);
     esp_gatt_status_t status = ESP_GATT_OK;
     if (prepare_write_env->prepare_buf == NULL)
     {
@@ -390,7 +390,7 @@ void example_prepare_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t*
         prepare_write_env->prepare_len = 0;
         if (prepare_write_env->prepare_buf == NULL)
         {
-            ESP_LOGE(WATERROWER_TAG, "%s, Gatt_server prep no mem", __func__);
+            ESP_LOGE(TAG, "%s, Gatt_server prep no mem", __func__);
             status = ESP_GATT_NO_RESOURCES;
         }
     }
@@ -419,13 +419,13 @@ void example_prepare_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t*
             esp_err_t response_err = esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, status, gatt_rsp);
             if (response_err != ESP_OK)
             {
-                ESP_LOGE(WATERROWER_TAG, "Send response error");
+                ESP_LOGE(TAG, "Send response error");
             }
             free(gatt_rsp);
         }
         else
         {
-            ESP_LOGE(WATERROWER_TAG, "%s, malloc failed", __func__);
+            ESP_LOGE(TAG, "%s, malloc failed", __func__);
         }
     }
     if (status != ESP_GATT_OK)
@@ -443,11 +443,11 @@ void example_exec_write_event_env(prepare_type_env_t* prepare_write_env, esp_ble
 {
     if (param->exec_write.exec_write_flag == ESP_GATT_PREP_WRITE_EXEC && prepare_write_env->prepare_buf)
     {
-        esp_log_buffer_hex(WATERROWER_TAG, prepare_write_env->prepare_buf, prepare_write_env->prepare_len);
+        esp_log_buffer_hex(TAG, prepare_write_env->prepare_buf, prepare_write_env->prepare_len);
     }
     else
     {
-        ESP_LOGI(WATERROWER_TAG, "ESP_GATT_PREP_WRITE_CANCEL");
+        ESP_LOGI(TAG, "ESP_GATT_PREP_WRITE_CANCEL");
     }
     if (prepare_write_env->prepare_buf)
     {
@@ -504,11 +504,11 @@ void notify_hr_measurement(void* p)
         hr_measurement_value[0] = hr >> 8;
         hr_measurement_value[1] = hr & 0xff;
 
-        ESP_LOGI(WATERROWER_TAG, "gatts_if: %u conn_id: %u hr %d", gatts_if, conn_id, hr);
+        ESP_LOGI(TAG, "gatts_if: %u conn_id: %u hr %d", gatts_if, conn_id, hr);
         esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
         if (ret != ESP_OK)
         {
-            ESP_LOGI(WATERROWER_TAG, "HR notify error (%d)", ret);
+            ESP_LOGI(TAG, "HR notify error (%d)", ret);
             vTaskDelete(NULL);
         }
 
@@ -578,11 +578,11 @@ void notify_ftms_rower_data(void* p)
         rower_data_value[18] = elapsed & 0xff;
         rower_data_value[19] = (elapsed >> 8) & 0xff;
 
-        ESP_LOGI(WATERROWER_TAG, "gatts_if: %u conn_id: %u spm %d strokes %d", gatts_if, conn_id, stroke_rate, total_strokes);
+        ESP_LOGI(TAG, "gatts_if: %u conn_id: %u spm %d strokes %d", gatts_if, conn_id, stroke_rate, total_strokes);
         esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value), rower_data_value, false);
         if (ret != ESP_OK)
         {
-            ESP_LOGI(WATERROWER_TAG, "FTMS rower data notify error (%d)", ret);
+            ESP_LOGI(TAG, "FTMS rower data notify error (%d)", ret);
             vTaskDelete(NULL);
         }
 
@@ -613,7 +613,7 @@ void notify_csc_measurement(void* p)
     //double spm_ms = spm / 60.0 / 1000.0;
     double period = 1.0 / strokes_per_minute * 60.0 * 1024.0;
 
-    ESP_LOGI(WATERROWER_TAG, "revolution time: %f 1/1024s", period);
+    ESP_LOGI(TAG, "revolution time: %f 1/1024s", period);
     double fractional_crank_revs = 0;
 
     for (;;)
@@ -626,7 +626,7 @@ void notify_csc_measurement(void* p)
 
             double new_cranks = strokes_per_second * elasped;
 
-            //ESP_LOGI(WATERROWER_TAG, "elasped: %f strokes_per_second: %f new_cranks: %f total_cranks: %f", elasped, strokes_per_second, new_cranks, fractional_crank_revs);
+            //ESP_LOGI(TAG, "elasped: %f strokes_per_second: %f new_cranks: %f total_cranks: %f", elasped, strokes_per_second, new_cranks, fractional_crank_revs);
 
             fractional_crank_revs += new_cranks;
         }
@@ -647,7 +647,7 @@ void notify_csc_measurement(void* p)
             esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, csc_handle_table[IDX_CSC_MEASUREMENT_VAL], sizeof(csc_measurement_value), csc_measurement_value, false);
             if (ret != ESP_OK)
             {
-                ESP_LOGI(WATERROWER_TAG, "CSC notify error (%d)", ret);
+                ESP_LOGI(TAG, "CSC notify error (%d)", ret);
                 vTaskDelete(NULL);
             }
 
@@ -657,7 +657,7 @@ void notify_csc_measurement(void* p)
                 unsigned int time_diff = ts - last_ts;
                 unsigned int cad = cranks_diff * 60 * 1024 / time_diff;
 
-                ESP_LOGI(WATERROWER_TAG, "gatts_if: %u conn_id: %u cranks: %u => %u (%u) time: %u => %u (%u) cadence: %u", gatts_if, conn_id, last_crank_revs, crank_revs, cranks_diff, last_ts, ts, time_diff, cad);
+                ESP_LOGI(TAG, "gatts_if: %u conn_id: %u cranks: %u => %u (%u) time: %u => %u (%u) cadence: %u", gatts_if, conn_id, last_crank_revs, crank_revs, cranks_diff, last_ts, ts, time_diff, cad);
             }
 
             last_crank_revs = crank_revs;
@@ -678,18 +678,18 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             esp_err_t set_dev_name_ret = esp_ble_gap_set_device_name(WATERROWER_DEVICE_NAME);
             if (set_dev_name_ret)
             {
-                ESP_LOGE(WATERROWER_TAG, "set device name failed, error code = %x", set_dev_name_ret);
+                ESP_LOGE(TAG, "set device name failed, error code = %x", set_dev_name_ret);
             }
             esp_err_t raw_adv_ret = esp_ble_gap_config_adv_data_raw(raw_adv_data, sizeof(raw_adv_data));
             if (raw_adv_ret)
             {
-                ESP_LOGE(WATERROWER_TAG, "config raw adv data failed, error code = %x ", raw_adv_ret);
+                ESP_LOGE(TAG, "config raw adv data failed, error code = %x ", raw_adv_ret);
             }
             adv_config_done |= ADV_CONFIG_FLAG;
             // esp_err_t raw_scan_ret = esp_ble_gap_config_scan_rsp_data_raw(raw_scan_rsp_data, sizeof(raw_scan_rsp_data));
             // if (raw_scan_ret)
             // {
-            //     ESP_LOGE(WATERROWER_TAG, "config raw scan rsp data failed, error code = %x", raw_scan_ret);
+            //     ESP_LOGE(TAG, "config raw scan rsp data failed, error code = %x", raw_scan_ret);
             // }
             // adv_config_done |= SCAN_RSP_CONFIG_FLAG;
             ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_csc_db, gatts_if, CSC_IDX_NB, CSC_SVC_INST_ID));
@@ -698,17 +698,17 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             break;
         }
         case ESP_GATTS_READ_EVT:
-            ESP_LOGI(WATERROWER_TAG, "ESP_GATTS_READ_EVT");
+            ESP_LOGI(TAG, "ESP_GATTS_READ_EVT");
             break;
         case ESP_GATTS_WRITE_EVT:
             if (!param->write.is_prep)
             {
                 // the data length of gattc write  must be less than GATTS_DEMO_CHAR_VAL_LEN_MAX.
-                ESP_LOGI(WATERROWER_TAG, "GATT_WRITE_EVT, handle = %d, value len = %d, value :", param->write.handle, param->write.len);
-                esp_log_buffer_hex(WATERROWER_TAG, param->write.value, param->write.len);
+                ESP_LOGI(TAG, "GATT_WRITE_EVT, handle = %d, value len = %d, value :", param->write.handle, param->write.len);
+                esp_log_buffer_hex(TAG, param->write.value, param->write.len);
                 if (csc_handle_table[IDX_CSC_MEASUREMENT_CFG] == param->write.handle && param->write.len == 2)
                 {
-                    ESP_LOGI(WATERROWER_TAG, "start CSC notify");
+                    ESP_LOGI(TAG, "start CSC notify");
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
@@ -717,12 +717,12 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                     }
                     else
                     {
-                        ESP_LOGI(WATERROWER_TAG, "kill csc notify %u %u", gatts_if, param->write.conn_id);
+                        ESP_LOGI(TAG, "kill csc notify %u %u", gatts_if, param->write.conn_id);
                     }
                 }
                 else if (hr_handle_table[IDX_HR_MEASUREMENT_CFG] == param->write.handle && param->write.len == 2)
                 {
-                    ESP_LOGI(WATERROWER_TAG, "start HR notify");
+                    ESP_LOGI(TAG, "start HR notify");
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
@@ -731,12 +731,12 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                     }
                     else
                     {
-                        ESP_LOGI(WATERROWER_TAG, "kill hr notify %u %u", gatts_if, param->write.conn_id);
+                        ESP_LOGI(TAG, "kill hr notify %u %u", gatts_if, param->write.conn_id);
                     }
                 }
                 else if (ftms_handle_table[IDX_FTMS_ROWER_DATA_CFG] == param->write.handle && param->write.len == 2)
                 {
-                    ESP_LOGI(WATERROWER_TAG, "start rower data notify");
+                    ESP_LOGI(TAG, "start rower data notify");
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
@@ -745,12 +745,12 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                     }
                     else
                     {
-                        ESP_LOGI(WATERROWER_TAG, "kill rower data notify %u %u", gatts_if, param->write.conn_id);
+                        ESP_LOGI(TAG, "kill rower data notify %u %u", gatts_if, param->write.conn_id);
                     }
                 }
                 // else if (ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_CFG] == param->write.handle && param->write.len == 2)
                 // {
-                //     ESP_LOGI(WATERROWER_TAG, "start indoor bike data notify");
+                //     ESP_LOGI(TAG, "start indoor bike data notify");
                 //     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                 //     if ((descr_value & 1) == 1)
                 //     {
@@ -759,7 +759,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 //     }
                 //     else
                 //     {
-                //         ESP_LOGI(WATERROWER_TAG, "kill indoor bike data notify %u %u", gatts_if, param->write.conn_id);
+                //         ESP_LOGI(TAG, "kill indoor bike data notify %u %u", gatts_if, param->write.conn_id);
                 //     }
                 // }
                 /* send response when param->write.need_rsp is true*/
@@ -776,22 +776,22 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             break;
         case ESP_GATTS_EXEC_WRITE_EVT:
             // the length of gattc prepare write data must be less than GATTS_DEMO_CHAR_VAL_LEN_MAX. 
-            ESP_LOGI(WATERROWER_TAG, "ESP_GATTS_EXEC_WRITE_EVT");
+            ESP_LOGI(TAG, "ESP_GATTS_EXEC_WRITE_EVT");
             example_exec_write_event_env(&prepare_write_env, param);
             break;
         case ESP_GATTS_MTU_EVT:
-            ESP_LOGI(WATERROWER_TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
+            ESP_LOGI(TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
             break;
         case ESP_GATTS_CONF_EVT:
-            ESP_LOGI(WATERROWER_TAG, "ESP_GATTS_CONF_EVT, status = %d, attr_handle %d", param->conf.status, param->conf.handle);
+            ESP_LOGI(TAG, "ESP_GATTS_CONF_EVT, status = %d, attr_handle %d", param->conf.status, param->conf.handle);
             break;
         case ESP_GATTS_START_EVT:
-            ESP_LOGI(WATERROWER_TAG, "SERVICE_START_EVT, status %d, service_handle %d", param->start.status, param->start.service_handle);
+            ESP_LOGI(TAG, "SERVICE_START_EVT, status %d, service_handle %d", param->start.status, param->start.service_handle);
             break;
         case ESP_GATTS_CONNECT_EVT:
         {
-            ESP_LOGI(WATERROWER_TAG, "ESP_GATTS_CONNECT_EVT, conn_id = %d", param->connect.conn_id);
-            esp_log_buffer_hex(WATERROWER_TAG, param->connect.remote_bda, 6);
+            ESP_LOGI(TAG, "ESP_GATTS_CONNECT_EVT, conn_id = %d", param->connect.conn_id);
+            esp_log_buffer_hex(TAG, param->connect.remote_bda, 6);
             esp_ble_conn_update_params_t conn_params = { 0 };
             memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
             /* For the iOS system, please refer to Apple official documents about the BLE connection parameters restrictions. */
@@ -806,18 +806,18 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             break;
         }
         case ESP_GATTS_DISCONNECT_EVT:
-            ESP_LOGI(WATERROWER_TAG, "ESP_GATTS_DISCONNECT_EVT, reason = 0x%x", param->disconnect.reason);
+            ESP_LOGI(TAG, "ESP_GATTS_DISCONNECT_EVT, reason = 0x%x", param->disconnect.reason);
             esp_ble_gap_start_advertising(&adv_params);
             break;
         case ESP_GATTS_CREAT_ATTR_TAB_EVT:
         {
             if (param->add_attr_tab.status != ESP_GATT_OK)
             {
-                ESP_LOGE(WATERROWER_TAG, "create attribute table failed, error code=0x%x", param->add_attr_tab.status);
+                ESP_LOGE(TAG, "create attribute table failed, error code=0x%x", param->add_attr_tab.status);
             }
             else
             {
-                ESP_LOGI(WATERROWER_TAG, "create attribute table successfully, the number handle = %d\n", param->add_attr_tab.num_handle);
+                ESP_LOGI(TAG, "create attribute table successfully, the number handle = %d\n", param->add_attr_tab.num_handle);
                 switch (param->add_attr_tab.svc_inst_id)
                 {
                     case FTMS_SVC_INST_ID:
@@ -862,7 +862,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
         }
         else
         {
-            ESP_LOGE(WATERROWER_TAG, "reg app failed, app_id %04x, status %d",
+            ESP_LOGE(TAG, "reg app failed, app_id %04x, status %d",
                 param->reg.app_id,
                 param->reg.status);
             return;
@@ -896,14 +896,14 @@ void app_main(void)
     ESP_ERROR_CHECK(usb_init());
     ESP_ERROR_CHECK(waterrower_init());
 
-    // esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    // ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
-    // ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
-    // ESP_ERROR_CHECK(esp_bluedroid_init());
-    // ESP_ERROR_CHECK(esp_bluedroid_enable());
-    // //ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_event_handler));
-    // ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_profile_event_handler));
-    // ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));
-    // ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_APP_ID));
-    // ESP_ERROR_CHECK(esp_ble_gatt_set_local_mtu(500));
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
+    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
+    ESP_ERROR_CHECK(esp_bluedroid_init());
+    ESP_ERROR_CHECK(esp_bluedroid_enable());
+    //ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_event_handler));
+    ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_profile_event_handler));
+    ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));
+    ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_APP_ID));
+    ESP_ERROR_CHECK(esp_ble_gatt_set_local_mtu(500));
 }

@@ -112,9 +112,7 @@ static void waterrower_out_callback(usb_transfer_t* transfer)
 
 esp_err_t waterrower_setup(waterrower_driver_t* driver)
 {
-    ESP_LOGI(TAG, "q1");
     ESP_ERROR_CHECK(usb_host_interface_claim(driver->client_hdl, driver->dev_hdl, WATERROWER_INTERFACE_NUMBER, 0));
-    ESP_LOGI(TAG, "q2");
     ESP_ERROR_CHECK(usb_host_transfer_alloc(WATERROWER_MAX_PACKET_SIZE, 0, &driver->in_transfer));
 
     driver->in_transfer->timeout_ms = 1000;
@@ -124,10 +122,8 @@ esp_err_t waterrower_setup(waterrower_driver_t* driver)
     driver->in_transfer->bEndpointAddress = WATERROWER_IN_ENDPOINT_ADDRESS;
     driver->in_transfer->num_bytes = WATERROWER_MAX_PACKET_SIZE;
 
-    ESP_LOGI(TAG, "q3");
     ESP_ERROR_CHECK(usb_host_transfer_submit(driver->in_transfer));
 
-    ESP_LOGI(TAG, "q4");
     ESP_ERROR_CHECK(usb_host_transfer_alloc(WATERROWER_MAX_PACKET_SIZE, 0, &driver->out_transfer));
 
     driver->out_transfer->timeout_ms = 1000;
@@ -136,8 +132,7 @@ esp_err_t waterrower_setup(waterrower_driver_t* driver)
     driver->out_transfer->context = driver;
     driver->out_transfer->bEndpointAddress = WATERROWER_OUT_ENDPOINT_ADDRESS; 
 
-    ESP_LOGI(TAG, "q5");
-    xTaskCreate(waterrower_out_transfer_task, "wr_out_transfer_task", 4096, driver, 1, NULL);
+    xTaskCreate(waterrower_out_transfer_task, "wr_out_transfer_task", 4096, driver, 23, NULL);
 
     waterrower_command(driver, WATERROWER_COMMAND_USB);
 
@@ -163,7 +158,7 @@ esp_err_t waterrower_init()
     };
     ESP_ERROR_CHECK(usb_host_client_register(&client_config, &driver->client_hdl));
 
-    xTaskCreate(waterrower_event_handler_task, "waterrower_event_handler_task", 4096, (void*)driver, 1, NULL);
+    xTaskCreate(waterrower_event_handler_task, "waterrower_event_handler_task", 4096, (void*)driver, 23, NULL);
 
     gpio_config_t io_conf;
 
@@ -175,8 +170,8 @@ esp_err_t waterrower_init()
 
     gpio_config(&io_conf);
 
-    ESP_LOGI(TAG, "Waiting 10s to power on...");
-    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    ESP_LOGI(TAG, "Waiting 2s to power on...");
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
     ESP_LOGI(TAG, "Power on");
     gpio_set_level(GPIO_NUM_8, 1);
 

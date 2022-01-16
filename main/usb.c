@@ -24,9 +24,9 @@ esp_err_t usb_init()
     };
     ESP_ERROR_CHECK(usb_host_install(&host_config));
 
-    xTaskCreate(usb_host_lib_task, "usb_host_lib_task", 4096, usb_ready_sem, 2, NULL);
+    xTaskCreate(usb_host_lib_task, "usb_host_lib_task", 4096, NULL, 23, NULL);
 
-    xSemaphoreTake(usb_ready_sem, portMAX_DELAY);
+    //xSemaphoreTake(usb_ready_sem, portMAX_DELAY);
 
     return ESP_OK;
 }
