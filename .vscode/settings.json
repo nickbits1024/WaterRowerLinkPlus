@@ -14,6 +14,10 @@
         "complex": "c",
         "format": "c",
         "xmemory": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "regex": "c",
+        "xlocale": "c",
+        "xstring": "c",
+        "semphr.h": "c"
     }
 }
