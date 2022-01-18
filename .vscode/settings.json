@@ -18,6 +18,10 @@
         "regex": "c",
         "xlocale": "c",
         "xstring": "c",
-        "semphr.h": "c"
+        "semphr.h": "c",
+        "chrono": "c",
+        "xutility": "c",
+        "random": "c",
+        "*.ipp": "c"
     }
 }

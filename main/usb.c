@@ -26,7 +26,5 @@ esp_err_t usb_init()
 
     xTaskCreate(usb_host_lib_task, "usb_host_lib_task", 4096, NULL, 23, NULL);
 
-    //xSemaphoreTake(usb_ready_sem, portMAX_DELAY);
-
     return ESP_OK;
 }
