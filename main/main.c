@@ -82,8 +82,6 @@ static uint8_t raw_adv_data[] = {
     0x05, 0x09, 'W', 'R', 'L', '+',
     /* manufactuer data */
     0x05, 0xff,0xff, 0xff, 0x77, 0x72
-    /* ftms service rower*/
-    //0x06, 0x16, 0x26, 0x18, 0x01, 0b00010000, 0b00000000,
     /* ftms service rower + indoor bike data*/
     //0x06, 0x16, 0x26, 0x18, 0x01, 0b00110000, 0b00000000,
 };
@@ -667,11 +665,12 @@ void notify_ftms_rower_data(void* p)
             break;
         }
 
-        uint16_t stroke_rate = values.stroke_rate * 2;
+        uint8_t stroke_rate = values.stroke_rate_x2;        
         uint16_t stroke_count = values.stroke_count;
+        uint8_t stroke_average = values.stroke_average;
         uint32_t distance = values.distance;
         uint16_t pace = values.current_speed != 0 ? 500 * 100 / values.current_speed : 0;
-        uint16_t watts = values.watts;
+        uint16_t power = values.power;
         uint16_t calories = values.calories;
         uint16_t cal_hour = 0xffff;
         uint8_t cal_min = 0xff;
@@ -690,8 +689,8 @@ void notify_ftms_rower_data(void* p)
         rower_data_value_value[7] = (distance >> 16) & 0xff;
         rower_data_value_value[8] = pace & 0xff;
         rower_data_value_value[9] = (pace >> 8) & 0xff;
-        rower_data_value_value[10] = watts & 0xff;
-        rower_data_value_value[11] = (watts >> 8) & 0xff;
+        rower_data_value_value[10] = power & 0xff;
+        rower_data_value_value[11] = (power >> 8) & 0xff;
         rower_data_value_value[12] = calories & 0xff;
         rower_data_value_value[13] = (calories >> 8) & 0xff;
         rower_data_value_value[14] = cal_hour & 0xff;
@@ -701,7 +700,8 @@ void notify_ftms_rower_data(void* p)
         rower_data_value_value[18] = elapsed & 0xff;
         rower_data_value_value[19] = (elapsed >> 8) & 0xff;
 
-        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, distance: %u, strokes: %u }", elapsed, distance, values.stroke_count);
+        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %u (%u), distance: %u, strokes: %u, cal: %u power: %u stroke_average: %u }", 
+            elapsed, stroke_rate / 2, values.stroke_rate, distance, values.stroke_count, calories, power, stroke_average);
 
         ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
         if (ret != ESP_OK)
@@ -746,16 +746,14 @@ void notify_ftms_indoor_bike_data(void* p)
         }
 
         uint16_t speed = values.current_speed * 100;
-        uint16_t cadence = values.stroke_rate * 2;
+        uint8_t cadence = values.stroke_rate_x2 / 2;
         uint32_t distance = values.distance;
-        uint16_t watts = values.watts;
+        uint16_t power = values.power;
         uint16_t calories = values.calories;
         uint16_t cal_hour = 0xffff;
         uint8_t cal_min = 0xff;
         uint8_t heart_rate = values.heart_rate;
         uint16_t elapsed = (uint16_t)(int)values.timer;
-
-        watts = 99;
 
         uint8_t indoor_bike_data_value[19];
 
@@ -768,8 +766,8 @@ void notify_ftms_indoor_bike_data(void* p)
         indoor_bike_data_value[6] = distance & 0xff;
         indoor_bike_data_value[7] = (distance >> 8) & 0xff;
         indoor_bike_data_value[8] = (distance >> 16) & 0xff;
-        indoor_bike_data_value[9] = watts & 0xff;
-        indoor_bike_data_value[10] = (watts >> 8) & 0xff;
+        indoor_bike_data_value[9] = power & 0xff;
+        indoor_bike_data_value[10] = (power >> 8) & 0xff;
         indoor_bike_data_value[11] = calories & 0xff;
         indoor_bike_data_value[12] = (calories >> 8) & 0xff;
         indoor_bike_data_value[13] = cal_hour & 0xff;
@@ -796,25 +794,13 @@ void notify_ftms_indoor_bike_data(void* p)
 void notify_csc_measurement(void* p)
 {
     esp_err_t ret;
-    // int strokes_per_minute = 121;
-    // double strokes_per_second = strokes_per_minute / 60.0;
 
     esp_gatt_if_t gatts_if = ((intptr_t)p) >> 16;
     uint16_t conn_id = ((intptr_t)p) & 0xffff;
 
-    // //double raw_cranks = 0.0;
-    //int64_t last_now = -1;
     uint16_t last_crank_revs = 0;
-    // //uint16_t last_ts = 0;
     uint16_t first_stroke_count;
     int64_t first_ts;
-
-    // //double spm_ms = spm / 60.0 / 1000.0;
-    // double period = 1.0 / strokes_per_minute * 60.0 * 1024.0;
-
-    // ESP_LOGI(TAG, "revolution time: %f 1/1024s", period);
-    //double crank_revs_dec = 0.0;
-    //double ts_dec = 0.0;
 
     for (int i = 0;; i++)
     {
@@ -825,44 +811,13 @@ void notify_csc_measurement(void* p)
             break;
         }
 
-        // int64_t now = esp_timer_get_time();
-        // double period = values.stroke_rate != 0 ? 1.0 / values.stroke_rate * 60.0 * 1024.0 : 0;
-
-        // if (last_now == -1)
-        // {
-        //     crank_revs_dec = values.stroke_count;
-        //     ts_dec = 0.0;
-        // }
-        // else
-        // {
-        //     double elapsed = (now - last_now) / 1000000.0;
-
-        //     double new_cranks = (values.stroke_rate / 60.0) * elapsed;
-
-        //     //ESP_LOGI(TAG, "elasped: %f strokes_per_second: %f new_cranks: %f total_cranks: %f", elapsed, strokes_per_second, new_cranks, fractional_crank_revs);
-        //     //ESP_LOGI(TAG, "ble csc stroke_rate %u new_cranks %f elasped %f", values.stroke_rate, new_cranks, elapsed);
-
-        //     crank_revs_dec += new_cranks;
-        //     ts_dec += new_cranks * period;
-        // }        
-
-        // //uint16_t crank_revs = (uint16_t)crank_revs_dec;
-        // //uint16_t ts = (uint16_t)ts_dec;
-
         int64_t now = esp_timer_get_time() / 1000 * 1024 / 1000;
 
         if (i == 0)
         {
-            //first_stroke_count = values.stroke_count;
-            //first_timer = values.timer;
-            //first_timer = now;
-
             first_stroke_count = values.stroke_start_count;
             first_ts = values.last_stroke_start_ts;
         }
-
-        //uint16_t crank_revs = (values.stroke_count - first_stroke_count);
-        //uint16_t ts = (uint16_t)(now - first_timer);
 
         uint16_t crank_revs = values.stroke_start_count - first_stroke_count;
         uint16_t ts = (values.last_stroke_start_ts - first_ts) / 1000 * 1024 / 1000;
@@ -884,21 +839,8 @@ void notify_csc_measurement(void* p)
             {
                 break;
             }
-
-            // if (last_ts != 0)
-            // {
-            //     unsigned int cranks_diff = crank_revs - last_crank_revs;
-            //     unsigned int time_diff = ts - last_ts;
-            //     unsigned int cad = cranks_diff * 60 * 1024 / time_diff;
-
-            //     ESP_LOGI(TAG, "ble csc cranks: %u => %u (%u) time: %u => %u (%u) cadence: %u", last_crank_revs, crank_revs, cranks_diff, last_ts, ts, time_diff, cad);
-            // }
-
             last_crank_revs = crank_revs;
-            //last_ts = ts;
         }
-
-        //last_now = now;
 
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }

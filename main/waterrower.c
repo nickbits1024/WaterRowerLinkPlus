@@ -28,7 +28,6 @@ typedef struct
 {
     uint16_t address;
     uint8_t size;
-    uint8_t base;
     const char* name;
 }
 waterrower_variable_t;
@@ -37,12 +36,12 @@ waterrower_variable_t;
 enum
 {
     WATERROWER_DISTANCE,
-    WATERROWER_WATTS,
+    WATERROWER_POWER,
     WATERROWER_CALORIES,
     WATERROWER_STROKE_COUNT,
+    WATERROWER_STROKE_AVERAGE,
     WATERROWER_CURRENT_SPEED,
     WATERROWER_HEART_RATE,
-    WATERROWER_500_PACE,
     WATERROWER_STROKE_RATE,
     WATERROWER_TIMER_SECOND_DEC,
     WATERROWER_TIMER_SECOND,
@@ -52,18 +51,18 @@ enum
 
 waterrower_variable_t memory_map[] =
 {
-    [WATERROWER_DISTANCE] = { 0x055, WATERROWER_DOUBLE_VALUE, 16, "distance" },
-    [WATERROWER_WATTS] = { 0x088, WATERROWER_DOUBLE_VALUE, 16, "watts" },
-    [WATERROWER_CALORIES] = { 0x08a, WATERROWER_TRIPLE_VALUE, 16, "calories" },
-    [WATERROWER_STROKE_COUNT] = { 0x140, WATERROWER_DOUBLE_VALUE, 16, "stroke_count" },
-    [WATERROWER_CURRENT_SPEED] = { 0x14a, WATERROWER_DOUBLE_VALUE, 16, "current_speed" },
-    [WATERROWER_HEART_RATE] = { 0x1a0, WATERROWER_SINGLE_VALUE, 16, "heart_rate" },
-    [WATERROWER_500_PACE] = { 0x1a6, WATERROWER_DOUBLE_VALUE, 16, "500_pace" },
-    [WATERROWER_STROKE_RATE] = { 0x1a9, WATERROWER_SINGLE_VALUE, 16, "stroke_rate" },
-    [WATERROWER_TIMER_SECOND_DEC] = { 0x1e0, WATERROWER_SINGLE_VALUE, 10, "timer_second_dec" },
-    [WATERROWER_TIMER_SECOND] = { 0x1e1, WATERROWER_SINGLE_VALUE, 10, "timer_second" },
-    [WATERROWER_TIMER_MINUTE] = { 0x1e2, WATERROWER_SINGLE_VALUE, 10, "timer_minute" },
-    [WATERROWER_TIMER_HOUR] = { 0x1e3, WATERROWER_SINGLE_VALUE, 10, "timer_hour" }
+    [WATERROWER_DISTANCE] = { 0x055, WATERROWER_DOUBLE_VALUE, "distance" },
+    [WATERROWER_POWER] = { 0x088, WATERROWER_DOUBLE_VALUE, "power" },
+    [WATERROWER_CALORIES] = { 0x08a, WATERROWER_TRIPLE_VALUE, "calories" },
+    [WATERROWER_STROKE_COUNT] = { 0x140, WATERROWER_DOUBLE_VALUE, "stroke_count" },
+    [WATERROWER_STROKE_AVERAGE] = { 0x142, WATERROWER_SINGLE_VALUE, "stroke_average" },
+    [WATERROWER_CURRENT_SPEED] = { 0x14a, WATERROWER_DOUBLE_VALUE, "current_speed" },
+    [WATERROWER_HEART_RATE] = { 0x1a0, WATERROWER_SINGLE_VALUE, "heart_rate" },
+    [WATERROWER_STROKE_RATE] = { 0x1a9, WATERROWER_SINGLE_VALUE, "stroke_rate" },
+    [WATERROWER_TIMER_SECOND_DEC] = { 0x1e0, WATERROWER_SINGLE_VALUE, "timer_second_dec" },
+    [WATERROWER_TIMER_SECOND] = { 0x1e1, WATERROWER_SINGLE_VALUE, "timer_second" },
+    [WATERROWER_TIMER_MINUTE] = { 0x1e2, WATERROWER_SINGLE_VALUE, "timer_minute" },
+    [WATERROWER_TIMER_HOUR] = { 0x1e3, WATERROWER_SINGLE_VALUE, "timer_hour" }
 };
 #define WATERROWER_MEMORY_MAP_SIZE  (sizeof(memory_map) / sizeof(waterrower_variable_t))
 
@@ -417,11 +416,23 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                     changed = true;
                 }
                 break;
-            case WATERROWER_WATTS:
-                if (driver->values.watts != value)
-                {
-                    driver->values.watts = value;
+            case WATERROWER_STROKE_AVERAGE:
+                if (driver->values.stroke_average != value)
+                {        
+                    driver->values.stroke_average = value;
+                    driver->values.stroke_rate_x2 = value != 0 ? (int8_t)(120000.0 / (value * 25.0) + 0.5) : 0; // 25ms units; stroke_rate is 2x
+
                     changed = true;
+                }
+                break;
+            case WATERROWER_POWER:
+                if (driver->values.power != value)
+                {
+                    if (value != 0 || driver->values.stroke_rate == 0)
+                    {
+                        driver->values.power = value;
+                        changed = true;
+                    }
                 }
                 break;
             case WATERROWER_CALORIES:
@@ -478,18 +489,16 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                     changed = true;
                 }
                 break;
-            case WATERROWER_500_PACE:
-                if (driver->values.pace_500 != value)
-                {
-                    driver->values.pace_500 = value;
-                    changed = true;
-                }
-                break;
             case WATERROWER_STROKE_RATE:
                 if (driver->values.stroke_rate != value)
                 {
                     driver->values.stroke_rate = value;
                     changed = true;
+
+                    if (value == 0)
+                    {
+                        driver->values.stroke_rate_x2 = 0;
+                    }
                 }
                 break;
         }
