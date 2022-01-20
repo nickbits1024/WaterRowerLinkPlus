@@ -700,8 +700,8 @@ void notify_ftms_rower_data(void* p)
         rower_data_value_value[18] = elapsed & 0xff;
         rower_data_value_value[19] = (elapsed >> 8) & 0xff;
 
-        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %u (%u), distance: %u, strokes: %u, cal: %u power: %u stroke_average: %u }", 
-            elapsed, stroke_rate / 2, values.stroke_rate, distance, values.stroke_count, calories, power, stroke_average);
+        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u (%06x) power: %u stroke_average: %u }", 
+            elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, calories, stroke_average);
 
         ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
         if (ret != ESP_OK)

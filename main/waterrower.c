@@ -42,7 +42,6 @@ enum
     WATERROWER_STROKE_AVERAGE,
     WATERROWER_CURRENT_SPEED,
     WATERROWER_HEART_RATE,
-    WATERROWER_STROKE_RATE,
     WATERROWER_TIMER_SECOND_DEC,
     WATERROWER_TIMER_SECOND,
     WATERROWER_TIMER_MINUTE,
@@ -58,7 +57,6 @@ waterrower_variable_t memory_map[] =
     [WATERROWER_STROKE_AVERAGE] = { 0x142, WATERROWER_SINGLE_VALUE, "stroke_average" },
     [WATERROWER_CURRENT_SPEED] = { 0x14a, WATERROWER_DOUBLE_VALUE, "current_speed" },
     [WATERROWER_HEART_RATE] = { 0x1a0, WATERROWER_SINGLE_VALUE, "heart_rate" },
-    [WATERROWER_STROKE_RATE] = { 0x1a9, WATERROWER_SINGLE_VALUE, "stroke_rate" },
     [WATERROWER_TIMER_SECOND_DEC] = { 0x1e0, WATERROWER_SINGLE_VALUE, "timer_second_dec" },
     [WATERROWER_TIMER_SECOND] = { 0x1e1, WATERROWER_SINGLE_VALUE, "timer_second" },
     [WATERROWER_TIMER_MINUTE] = { 0x1e2, WATERROWER_SINGLE_VALUE, "timer_minute" },
@@ -368,6 +366,38 @@ int waterrower_variable_compare(const void* a, const void* b)
     return (int)va->address - (int)vb->address;
 }
 
+static void waterrower_update_stroke_rate(waterrower_driver_t* driver)
+{
+    uint16_t stroke_period = driver->values.stroke_average * 25; // 25ms units;
+    int8_t stroke_rate_x2 = 0;
+    if (stroke_period != 0)
+    {
+        int64_t stalled_time = driver->values.last_stroke_start_ts != 0 ? 
+            (esp_timer_get_time() - driver->values.last_stroke_start_ts) / 1000 : 0;
+
+        if (stalled_time > 0)
+        {
+            ets_printf("Stalled for %llum period %ums\r\n", stalled_time, stroke_period);
+        }
+
+        stroke_rate_x2 = stroke_period != 0 ? (int8_t)(120000.0 / stroke_period + 0.5) : 0;
+        if (stalled_time >= 2 * stroke_period)
+        {
+            uint8_t stroke_rate_adjustment = stalled_time / stroke_period * 6;
+            ets_printf("Stalled for %llums adj -%u\r\n", stalled_time / 1000, stroke_rate_adjustment);
+            if (stroke_rate_x2 >= stroke_rate_adjustment)
+            {
+                stroke_rate_x2 -= stroke_rate_adjustment;
+            }
+            else
+            {
+                stroke_rate_x2 = 0;
+            }
+        }   
+    }
+    driver->values.stroke_rate_x2 = stroke_rate_x2;
+}
+
 static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, uint32_t value)
 {
     //ESP_LOGI(TAG, "Set [%03x] = %d", address, value);
@@ -420,15 +450,15 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                 if (driver->values.stroke_average != value)
                 {        
                     driver->values.stroke_average = value;
-                    driver->values.stroke_rate_x2 = value != 0 ? (int8_t)(120000.0 / (value * 25.0) + 0.5) : 0; // 25ms units; stroke_rate is 2x
-
                     changed = true;
                 }
+                waterrower_update_stroke_rate(driver);
+
                 break;
             case WATERROWER_POWER:
                 if (driver->values.power != value)
                 {
-                    if (value != 0 || driver->values.stroke_rate == 0)
+                    //if (value != 0 || driver->values.stroke_rate == 0)
                     {
                         driver->values.power = value;
                         changed = true;
@@ -436,7 +466,7 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                 }
                 break;
             case WATERROWER_CALORIES:
-                value = value / 1000;
+                value = (value + 500) / 1000;
                 if (driver->values.calories != value)
                 {
                     driver->values.calories = value;
@@ -487,18 +517,6 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                 {
                     driver->values.heart_rate = value;
                     changed = true;
-                }
-                break;
-            case WATERROWER_STROKE_RATE:
-                if (driver->values.stroke_rate != value)
-                {
-                    driver->values.stroke_rate = value;
-                    changed = true;
-
-                    if (value == 0)
-                    {
-                        driver->values.stroke_rate_x2 = 0;
-                    }
                 }
                 break;
         }

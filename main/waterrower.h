@@ -1,7 +1,6 @@
 
 typedef struct
 {
-    uint8_t stroke_rate;
     uint8_t stroke_rate_x2;
     uint16_t stroke_count;
     uint16_t stroke_average;
