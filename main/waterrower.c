@@ -458,7 +458,7 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
             case WATERROWER_POWER:
                 if (driver->values.power != value)
                 {
-                    //if (value != 0 || driver->values.stroke_rate == 0)
+                    if (value != 0 || driver->values.stroke_rate_x2 == 0)
                     {
                         driver->values.power = value;
                         changed = true;
