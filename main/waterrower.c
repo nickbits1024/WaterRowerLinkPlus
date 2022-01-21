@@ -9,10 +9,12 @@
 
 #define TAG "waterrower"
 
+#define WATERROWER_INACTIVTY_TIMEOUT        (60 * 15)
+
 #define WATERROWER_MAX_PACKET_SIZE          64
-#define WATERROWER_OUT_ENDPOINT_ADDRESS     0x03
-#define WATERROWER_IN_ENDPOINT_ADDRESS      0x83
-#define WATERROWER_INTERFACE_NUMBER         0x01
+#define WATERROWER_USB_ENDPOINT_OUT_ADDRESS 0x03
+#define WATERROWER_USB_ENDPOINT_IN_ADDRESS  0x83
+#define WATERROWER_USB_INTERFACE_NUMBER     0x01
 
 #define WATERROWER_MAX_COMMAND_SIZE         62
 
@@ -23,6 +25,11 @@
 #define WATERROWER_COMMAND_USB              "USB"
 #define WATERROWER_COMMAND_USB_RESPONSE     "_WR_"
 #define WATERROWER_COMMAND_RESET            "RESET"
+
+#define WATERROWER_USB_POWER_GPIO_NUM        GPIO_NUM_8
+#define WATERROWER_USB_POWER_GPIO_SEL        GPIO_SEL_8
+#define WATERROWER_POWER_BUTTON_GPIO_NUM     GPIO_NUM_10
+#define WATERROWER_POWER_BUTTON_GPIO_SEL     GPIO_SEL_10
 
 typedef struct
 {
@@ -86,11 +93,17 @@ typedef struct
 
     portMUX_TYPE values_mux;
     waterrower_values_t values;
+
+    //TaskHandle_t poll_task_handle;
+    TaskHandle_t out_transfer_task_handle;
 } waterrower_driver_t;
 
 
 static void waterrower_in_event(waterrower_driver_t* driver);
-static void waterrower_poll_task(void* arg);
+//static void waterrower_poll_task(void* arg);
+static esp_err_t waterrower_setup(waterrower_driver_t* driver);
+static esp_err_t waterrower_shutdown(waterrower_driver_t* driver);
+static void waterrower_read_memory(waterrower_driver_t* driver, const waterrower_variable_t* var);
 
 static void waterrower_client_event_handler(const usb_host_client_event_msg_t* event_msg, void* arg)
 {
@@ -107,7 +120,7 @@ static void waterrower_client_event_handler(const usb_host_client_event_msg_t* e
             break;
         case USB_HOST_CLIENT_EVENT_DEV_GONE:
             ESP_LOGI(TAG, "Device #%d disconnected", driver->dev_addr);
-            esp_restart();
+            driver->dev_addr = 0;
             break;
         default:
             ESP_LOGE(TAG, "Unkown USB client event");
@@ -154,13 +167,14 @@ static esp_err_t waterrower_command(waterrower_driver_t* driver, const char* cmd
     return ESP_OK;
 }
 
-static void waterrower_event_handler_task(void* arg)
+static void waterrower_usb_client_task(void* arg)
 {
     waterrower_driver_t* driver = (waterrower_driver_t*)arg;
 
     for (;;)
     {
         usb_host_client_handle_events(driver->client_hdl, portMAX_DELAY);
+        //ESP_LOGI(TAG, "client event");
     }
 }
 
@@ -177,6 +191,16 @@ static void waterrower_out_transfer_task(void* arg)
 static void waterrower_in_callback(usb_transfer_t* transfer)
 {
     waterrower_driver_t* driver = (waterrower_driver_t*)transfer->context;
+
+    if (transfer->status != USB_TRANSFER_STATUS_COMPLETED)
+    {
+        ESP_LOGI(TAG, "Inbound USB transfer failure %d", transfer->status);
+        if (transfer->status != USB_TRANSFER_STATUS_CANCELED)
+        {
+            abort();
+        }
+        return;
+    }
 
     char last_char = driver->in_buffer_size > 0 ? driver->in_buffer[driver->in_buffer_size - 1] : 0;
 
@@ -202,7 +226,7 @@ static void waterrower_in_callback(usb_transfer_t* transfer)
         }
 
         last_char = transfer->data_buffer[i];
-    }
+    }    
 
     ESP_ERROR_CHECK(usb_host_transfer_submit(driver->in_transfer));
 }
@@ -210,19 +234,105 @@ static void waterrower_in_callback(usb_transfer_t* transfer)
 static void waterrower_out_callback(usb_transfer_t* transfer)
 {
     waterrower_driver_t* driver = (waterrower_driver_t*)transfer->context;
-    xSemaphoreGive(driver->out_resp_sem);
+
+    if (transfer->status != USB_TRANSFER_STATUS_COMPLETED)
+    {
+        ESP_LOGI(TAG, "Output USB transfer failure %d", transfer->status);
+        if (transfer->status != USB_TRANSFER_STATUS_CANCELED)
+        {
+            abort();
+        }
+        return;
+    }
+
+    xSemaphoreGive(driver->out_resp_sem);    
 }
 
-esp_err_t waterrower_setup(waterrower_driver_t* driver)
+static void waterrower_session_task(void* arg)
 {
-    ESP_ERROR_CHECK(usb_host_interface_claim(driver->client_hdl, driver->dev_hdl, WATERROWER_INTERFACE_NUMBER, 0));
+    waterrower_driver_t* driver = (waterrower_driver_t*)arg;
+
+    for (;;)
+    {
+        ESP_LOGI(TAG, "Waiting for power button press");
+        while (gpio_get_level(WATERROWER_POWER_BUTTON_GPIO_NUM) == 1)
+        {
+            vTaskDelay(200 / portTICK_PERIOD_MS);
+        }
+        ESP_LOGI(TAG, "Power button pressed");
+        gpio_set_level(WATERROWER_USB_POWER_GPIO_NUM, 1);
+
+        xSemaphoreTake(driver->device_sem, portMAX_DELAY);
+
+        ESP_ERROR_CHECK(usb_host_device_open(driver->client_hdl, driver->dev_addr, &driver->dev_hdl));
+
+        usb_device_info_t dev_info;
+        ESP_ERROR_CHECK(usb_host_device_info(driver->dev_hdl, &dev_info));
+
+        uint16_t wr_marker[] = { 'W', 'R', '-', 'S', '4' };
+
+        if (dev_info.str_desc_product != NULL)
+        {
+            for (int i = 0; i < (dev_info.str_desc_product->bLength - sizeof(wr_marker)) / 2; i++)
+            {
+                if (memcmp(&dev_info.str_desc_product->wData[i], wr_marker, sizeof(wr_marker)) == 0)
+                {
+                    ESP_LOGI(TAG, "Found WR-S4 device");
+
+                    ESP_ERROR_CHECK(waterrower_setup(driver));
+                    break;
+                }
+            }
+        }
+        else
+        {
+            ESP_LOGI(TAG, "Found unknown device");
+            ESP_ERROR_CHECK(usb_host_device_close(driver->client_hdl, driver->dev_hdl));
+            continue;
+        }
+
+        waterrower_values_t values;
+        int64_t last_last_stroke_start_ts;
+        ESP_ERROR_CHECK(waterrower_get_values(driver, &values));
+        last_last_stroke_start_ts = values.last_stroke_start_ts;
+        ESP_LOGI(TAG, "Waiting for inactivity...");
+
+        int64_t inactive_ts = esp_timer_get_time();
+
+        do
+        {
+            for (int i = 0; i < WATERROWER_MEMORY_MAP_SIZE; i++)
+            {
+                waterrower_read_memory(driver, &memory_map[i]);
+            }
+
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            ESP_ERROR_CHECK(waterrower_get_values(driver, &values));
+            if (last_last_stroke_start_ts != values.last_stroke_start_ts)
+            {
+                inactive_ts = esp_timer_get_time();
+                last_last_stroke_start_ts = values.last_stroke_start_ts;
+            }
+        }
+        while (esp_timer_get_time() - inactive_ts < WATERROWER_INACTIVTY_TIMEOUT * 1000000llu);
+        ESP_LOGI(TAG, "Inactivity detected. Shutting down...");
+        ESP_ERROR_CHECK(waterrower_shutdown(driver));
+        gpio_set_level(WATERROWER_USB_POWER_GPIO_NUM, 0);
+
+        driver->dev_hdl = NULL;
+    }
+}
+
+static esp_err_t waterrower_setup(waterrower_driver_t* driver)
+{
+    ESP_ERROR_CHECK(usb_host_interface_claim(driver->client_hdl, driver->dev_hdl, WATERROWER_USB_INTERFACE_NUMBER, 0));
     ESP_ERROR_CHECK(usb_host_transfer_alloc(WATERROWER_MAX_PACKET_SIZE, 0, &driver->in_transfer));
 
     driver->in_transfer->timeout_ms = 1000;
     driver->in_transfer->device_handle = driver->dev_hdl;
     driver->in_transfer->callback = waterrower_in_callback;
     driver->in_transfer->context = driver;
-    driver->in_transfer->bEndpointAddress = WATERROWER_IN_ENDPOINT_ADDRESS;
+    driver->in_transfer->bEndpointAddress = WATERROWER_USB_ENDPOINT_IN_ADDRESS;
     driver->in_transfer->num_bytes = WATERROWER_MAX_PACKET_SIZE;
 
     ESP_ERROR_CHECK(usb_host_transfer_submit(driver->in_transfer));
@@ -233,13 +343,38 @@ esp_err_t waterrower_setup(waterrower_driver_t* driver)
     driver->out_transfer->device_handle = driver->dev_hdl;
     driver->out_transfer->callback = waterrower_out_callback;
     driver->out_transfer->context = driver;
-    driver->out_transfer->bEndpointAddress = WATERROWER_OUT_ENDPOINT_ADDRESS;
+    driver->out_transfer->bEndpointAddress = WATERROWER_USB_ENDPOINT_OUT_ADDRESS;
 
-    xTaskCreate(waterrower_out_transfer_task, "wr_out_transfer_task", 4096, driver, 23, NULL);
+    xTaskCreate(waterrower_out_transfer_task, "wr_out_transfer_task", 4096, driver, 23, &driver->out_transfer_task_handle);
 
     waterrower_command(driver, WATERROWER_COMMAND_USB, WATERROWER_COMMAND_USB_RESPONSE);
 
-    xTaskCreate(waterrower_poll_task, "waterrower_poll_task", 4096, driver, 23, NULL);
+    //xTaskCreate(waterrower_poll_task, "waterrower_poll_task", 4096, driver, 23, &driver->poll_task_handle);
+
+    return ESP_OK;
+}
+
+static esp_err_t waterrower_shutdown(waterrower_driver_t* driver)
+{
+    ESP_ERROR_CHECK(usb_host_endpoint_halt(driver->dev_hdl, WATERROWER_USB_ENDPOINT_IN_ADDRESS));
+    ESP_ERROR_CHECK(usb_host_endpoint_flush(driver->dev_hdl, WATERROWER_USB_ENDPOINT_IN_ADDRESS));
+    ESP_ERROR_CHECK(usb_host_endpoint_halt(driver->dev_hdl, WATERROWER_USB_ENDPOINT_OUT_ADDRESS));
+    ESP_ERROR_CHECK(usb_host_endpoint_flush(driver->dev_hdl, WATERROWER_USB_ENDPOINT_OUT_ADDRESS));
+    vTaskDelete(driver->out_transfer_task_handle);
+    driver->out_transfer_task_handle = NULL;
+
+    // process above events
+    usb_host_client_handle_events(driver->client_hdl, 0);
+
+    ESP_ERROR_CHECK(usb_host_transfer_free(driver->in_transfer));
+    driver->in_transfer = NULL;
+    ESP_ERROR_CHECK(usb_host_transfer_free(driver->out_transfer));
+    driver->out_transfer = NULL;
+
+    ESP_ERROR_CHECK(usb_host_interface_release(driver->client_hdl, driver->dev_hdl, WATERROWER_USB_INTERFACE_NUMBER));
+    ESP_ERROR_CHECK(usb_host_device_close(driver->client_hdl, driver->dev_hdl));
+    driver->dev_hdl = NULL;
+    driver->dev_addr = 0;
 
     return ESP_OK;
 }
@@ -258,6 +393,30 @@ esp_err_t waterrower_init(waterrower_handle_t* waterrower_handle)
     xSemaphoreGive(driver->cmd_sem);
     portMUX_INITIALIZE(&driver->values_mux);
 
+    gpio_config_t io_conf;
+
+    io_conf.pin_bit_mask = WATERROWER_USB_POWER_GPIO_SEL;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+
+    gpio_config(&io_conf);
+
+    // ESP_LOGI(TAG, "Waiting to power on...");
+    // vTaskDelay(10000 / portTICK_PERIOD_MS);
+    //ESP_LOGI(TAG, "Power on");
+    gpio_set_level(WATERROWER_USB_POWER_GPIO_NUM, 0);
+
+    io_conf.pin_bit_mask = WATERROWER_POWER_BUTTON_GPIO_SEL;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+
+    gpio_config(&io_conf);
+    //vTaskDelay(50 / portTICK_PERIOD_MS);
+
     usb_host_client_config_t client_config = {
         .is_synchronous = false,
         .max_num_event_msg = 5,
@@ -268,50 +427,8 @@ esp_err_t waterrower_init(waterrower_handle_t* waterrower_handle)
     };
     ESP_ERROR_CHECK(usb_host_client_register(&client_config, &driver->client_hdl));
 
-    xTaskCreate(waterrower_event_handler_task, "waterrower_event_handler_task", 4096, (void*)driver, 23, NULL);
-
-    gpio_config_t io_conf;
-
-    io_conf.pin_bit_mask = GPIO_SEL_8;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-
-    gpio_config(&io_conf);
-
-    // ESP_LOGI(TAG, "Waiting to power on...");
-    // vTaskDelay(10000 / portTICK_PERIOD_MS);
-    ESP_LOGI(TAG, "Power on");
-    gpio_set_level(GPIO_NUM_8, 1);
-
-    xSemaphoreTake(driver->device_sem, portMAX_DELAY);
-
-    ESP_ERROR_CHECK(usb_host_device_open(driver->client_hdl, driver->dev_addr, &driver->dev_hdl));
-
-    usb_device_info_t dev_info;
-    ESP_ERROR_CHECK(usb_host_device_info(driver->dev_hdl, &dev_info));
-
-    uint16_t wr_marker[] = { 'W', 'R', '-', 'S', '4' };
-
-    if (dev_info.str_desc_product != NULL)
-    {
-        for (int i = 0; i < (dev_info.str_desc_product->bLength - sizeof(wr_marker)) / 2; i++)
-        {
-            if (memcmp(&dev_info.str_desc_product->wData[i], wr_marker, sizeof(wr_marker)) == 0)
-            {
-                ESP_LOGI(TAG, "Found WR-S4 device");
-
-                ESP_ERROR_CHECK(waterrower_setup(driver));
-                break;
-            }
-        }
-    }
-    else
-    {
-        ESP_LOGI(TAG, "Found unknown device");
-        return ESP_FAIL;
-    }
+    xTaskCreate(waterrower_usb_client_task, "waterrower_usb_client_task", 4096, (void*)driver, 23, NULL);
+    xTaskCreate(waterrower_session_task, "waterrower_session_task", 4096, (void*)driver, 23, NULL);
 
     *waterrower_handle = driver;
 
@@ -329,19 +446,19 @@ static void waterrower_read_memory(waterrower_driver_t* driver, const waterrower
     waterrower_command(driver, cmd, resp);
 }
 
-static void waterrower_poll_task(void* arg)
-{
-    waterrower_driver_t* driver = (waterrower_driver_t*)arg;
-    for (;;)
-    {
-        for (int i = 0; i < WATERROWER_MEMORY_MAP_SIZE; i++)
-        {
-            waterrower_read_memory(driver, &memory_map[i]);
-        }
+// static void waterrower_poll_task(void* arg)
+// {
+//     waterrower_driver_t* driver = (waterrower_driver_t*)arg;
+//     for (;;)
+//     {
+//         for (int i = 0; i < WATERROWER_MEMORY_MAP_SIZE; i++)
+//         {
+//             waterrower_read_memory(driver, &memory_map[i]);
+//         }
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-}
+//         vTaskDelay(1000 / portTICK_PERIOD_MS);
+//     }
+// }
 
 esp_err_t waterrower_get_values(waterrower_handle_t waterrower_handle, waterrower_values_t* values)
 {
@@ -427,8 +544,8 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
         //ESP_LOGI(TAG, "index: %d base: %p var: %p diff: %u size: %u", index, memory_map, var, var - memory_map, sizeof(waterrower_variable_t));
 
         portENTER_CRITICAL(&driver->values_mux);
-        bool changed = false;
-        bool timer_changed = false;
+        //bool changed = false;
+        //bool timer_changed = false;
 
         switch (index)
         {
@@ -436,21 +553,21 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                 if (driver->values.distance != value)
                 {
                     driver->values.distance = value;
-                    changed = true;
+                    //changed = true;
                 }
                 break;
             case WATERROWER_STROKE_COUNT:
                 if (driver->values.stroke_count != value)
                 {
                     driver->values.stroke_count = value;
-                    changed = true;
+                    //changed = true;
                 }
                 break;
             case WATERROWER_STROKE_AVERAGE:
                 if (driver->values.stroke_average != value)
                 {        
                     driver->values.stroke_average = value;
-                    changed = true;
+                    //changed = true;
                 }
                 waterrower_update_stroke_rate(driver);
 
@@ -461,7 +578,7 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                     if (value != 0 || driver->values.stroke_rate_x2 == 0)
                     {
                         driver->values.power = value;
-                        changed = true;
+                        //changed = true;
                     }
                 }
                 break;
@@ -470,53 +587,53 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                 if (driver->values.calories != value)
                 {
                     driver->values.calories = value;
-                    changed = true;
+                    //changed = true;
                 }
                 break;
             case WATERROWER_CURRENT_SPEED:
                 if (driver->values.current_speed != value)
                 {
                     driver->values.current_speed = value;
-                    changed = true;
+                    //changed = true;
                 }
                 break;
             case WATERROWER_TIMER_SECOND_DEC:
                 if (driver->values.timer_second_dec != value)
                 {
                     driver->values.timer_second_dec = value;
-                    timer_changed = true;
-                    changed = true;
+                    //timer_changed = true;
+                    //changed = true;
                 }
                 break;
             case WATERROWER_TIMER_SECOND:
                 if (driver->values.timer_second != value)
                 {
                     driver->values.timer_second = value;
-                    timer_changed = true;
-                    changed = true;
+                    //timer_changed = true;
+                    //changed = true;
                 }
                 break;
             case WATERROWER_TIMER_MINUTE:
                 if (driver->values.timer_minute != value)
                 {
                     driver->values.timer_minute = value;
-                    timer_changed = true;
-                    changed = true;
+                    //timer_changed = true;
+                    //changed = true;
                 }
                 break;
             case WATERROWER_TIMER_HOUR:
                 if (driver->values.timer_hour != value)
                 {
                     driver->values.timer_hour = value;
-                    timer_changed = true;
-                    changed = true;
+                    //timer_changed = true;
+                    //changed = true;
                 }
                 break;
             case WATERROWER_HEART_RATE:
                 if (driver->values.heart_rate != value)
                 {
                     driver->values.heart_rate = value;
-                    changed = true;
+                    //changed = true;
                 }
                 break;
         }
