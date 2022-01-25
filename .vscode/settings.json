@@ -22,6 +22,13 @@
         "chrono": "c",
         "xutility": "c",
         "random": "c",
-        "*.ipp": "c"
+        "*.ipp": "c",
+        "istream": "c",
+        "optional": "c",
+        "system_error": "c",
+        "type_traits": "c",
+        "xlocmon": "c",
+        "xlocnum": "c",
+        "xtr1common": "c"
     }
 }

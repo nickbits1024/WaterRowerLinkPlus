@@ -29,6 +29,7 @@
 #include "esp_gatts_api.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
+#include "antplus.h"
 #include "usb.h"
 #include "waterrower.h"
 #include "main.h"
@@ -62,6 +63,7 @@ uint16_t ftms_handle_table[FTMS_IDX_NB];
 uint16_t hr_handle_table[HR_IDX_NB];
 
 waterrower_handle_t waterrower_handle;
+antplus_handle_t antplus_handle;
 
 typedef struct
 {
@@ -612,24 +614,29 @@ void notify_hr_measurement(void* p)
 
     for (;;)
     {
-        hr += increase ? 1 : -1;
-        if (hr < 60 || hr > 200)
+        waterrower_values_t values;
+        esp_err_t ret = waterrower_get_values(waterrower_handle, &values);
+        if (ret == ESP_OK)
         {
-            increase = !increase;
+            uint8_t heart_rate = values.heart_rate;
+
+            if (heart_rate == 0)
+            {
+                antplus_get_heart_rate(antplus_handle, &heart_rate);
+            }
+
+            uint8_t hr_measurement_value[2];
+            hr_measurement_value[0] = heart_rate >> 8;
+            hr_measurement_value[1] = heart_rate & 0xff;
+
+            ESP_LOGI(TAG, "ble hr %d", hr);
+            esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
+            if (ret != ESP_OK)
+            {
+                ESP_LOGI(TAG, "HR notify error (%d)", ret);
+                vTaskDelete(NULL);
+            }
         }
-
-        uint8_t hr_measurement_value[2];
-        hr_measurement_value[0] = hr >> 8;
-        hr_measurement_value[1] = hr & 0xff;
-
-        ESP_LOGI(TAG, "ble hr %d", hr);
-        esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
-        if (ret != ESP_OK)
-        {
-            ESP_LOGI(TAG, "HR notify error (%d)", ret);
-            vTaskDelete(NULL);
-        }
-
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
@@ -676,6 +683,11 @@ void notify_ftms_rower_data(void* p)
         uint8_t cal_min = 0xff;
         uint8_t heart_rate = values.heart_rate;
         uint16_t elapsed = (uint16_t)(int)values.timer;
+
+        if (heart_rate == 0)
+        {
+            antplus_get_heart_rate(antplus_handle, &heart_rate);
+        }
 
         uint8_t rower_data_value_value[20];
 
@@ -1070,6 +1082,7 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
 
+    ESP_ERROR_CHECK(antplus_init(&antplus_handle));
     ESP_ERROR_CHECK(usb_init());
     ESP_ERROR_CHECK(waterrower_init(&waterrower_handle));
 

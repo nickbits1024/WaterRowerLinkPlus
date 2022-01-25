@@ -1,4 +1,5 @@
 #include <string.h>
+#include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -43,12 +44,13 @@ waterrower_variable_t;
 enum
 {
     WATERROWER_DISTANCE,
-    WATERROWER_POWER,
+    //WATERROWER_POWER,
     WATERROWER_CALORIES,
     WATERROWER_STROKE_COUNT,
     WATERROWER_STROKE_AVERAGE,
     WATERROWER_CURRENT_SPEED,
     WATERROWER_HEART_RATE,
+    WATERROWER_500_PACE,
     WATERROWER_TIMER_SECOND_DEC,
     WATERROWER_TIMER_SECOND,
     WATERROWER_TIMER_MINUTE,
@@ -58,12 +60,13 @@ enum
 waterrower_variable_t memory_map[] =
 {
     [WATERROWER_DISTANCE] = { 0x055, WATERROWER_DOUBLE_VALUE, "distance" },
-    [WATERROWER_POWER] = { 0x088, WATERROWER_DOUBLE_VALUE, "power" },
+    //[WATERROWER_POWER] = { 0x088, WATERROWER_DOUBLE_VALUE, "power" },
     [WATERROWER_CALORIES] = { 0x08a, WATERROWER_TRIPLE_VALUE, "calories" },
     [WATERROWER_STROKE_COUNT] = { 0x140, WATERROWER_DOUBLE_VALUE, "stroke_count" },
     [WATERROWER_STROKE_AVERAGE] = { 0x142, WATERROWER_SINGLE_VALUE, "stroke_average" },
     [WATERROWER_CURRENT_SPEED] = { 0x14a, WATERROWER_DOUBLE_VALUE, "current_speed" },
     [WATERROWER_HEART_RATE] = { 0x1a0, WATERROWER_SINGLE_VALUE, "heart_rate" },
+    [WATERROWER_500_PACE] = { 0x1a5, WATERROWER_DOUBLE_VALUE, "500_pace" },
     [WATERROWER_TIMER_SECOND_DEC] = { 0x1e0, WATERROWER_SINGLE_VALUE, "timer_second_dec" },
     [WATERROWER_TIMER_SECOND] = { 0x1e1, WATERROWER_SINGLE_VALUE, "timer_second" },
     [WATERROWER_TIMER_MINUTE] = { 0x1e2, WATERROWER_SINGLE_VALUE, "timer_minute" },
@@ -492,16 +495,18 @@ static void waterrower_update_stroke_rate(waterrower_driver_t* driver)
         int64_t stalled_time = driver->values.last_stroke_start_ts != 0 ? 
             (esp_timer_get_time() - driver->values.last_stroke_start_ts) / 1000 : 0;
 
-        if (stalled_time > 0)
-        {
-            ets_printf("Stalled for %llum period %ums\r\n", stalled_time, stroke_period);
-        }
+        // if (stalled_time > 0)
+        // {
+        //     ets_printf("Stalled for %llums period %ums factor %u\r\n", stalled_time, stroke_period, (unsigned int)(stalled_time / stroke_period));
+        // }
 
-        stroke_rate_x2 = stroke_period != 0 ? (int8_t)(120000.0 / stroke_period + 0.5) : 0;
-        if (stalled_time >= 2 * stroke_period)
+        stroke_rate_x2 = (int8_t)(120000.0 / stroke_period + 0.5);
+        uint16_t stalled_threshold = 2 * stroke_period;
+        if (stalled_time >= stalled_threshold)
         {
-            uint8_t stroke_rate_adjustment = stalled_time / stroke_period * 6;
-            ets_printf("Stalled for %llums adj -%u\r\n", stalled_time / 1000, stroke_rate_adjustment);
+            uint32_t n = (stalled_time - stalled_threshold) / 1000 + 1;
+            uint8_t stroke_rate_adjustment = n * log2(n);
+            //ets_printf("Stalled for %llums n %u adj -%u\r\n", stalled_time, n, stroke_rate_adjustment);
             if (stroke_rate_x2 >= stroke_rate_adjustment)
             {
                 stroke_rate_x2 -= stroke_rate_adjustment;
@@ -572,15 +577,22 @@ static void waterrower_set_value(waterrower_driver_t* driver, uint16_t address, 
                 waterrower_update_stroke_rate(driver);
 
                 break;
-            case WATERROWER_POWER:
-                if (driver->values.power != value)
-                {
-                    if (value != 0 || driver->values.stroke_rate_x2 == 0)
-                    {
-                        driver->values.power = value;
-                        //changed = true;
-                    }
-                }
+            // case WATERROWER_POWER:
+            //     if (driver->values.power != value)
+            //     {
+            //         if (value != 0 || driver->values.stroke_rate_x2 == 0)
+            //         {
+            //             driver->values.power = value;
+            //             //changed = true;
+            //         }
+            //     }
+            //     break;
+            case WATERROWER_500_PACE:
+                // flip bytes.  500pace byte order reversed?!
+                value = ((value & 0xff) << 8) | (value >> 8);
+                // concept 2 calc
+                driver->values.power = value != 0 ? (uint16_t)(2.80 / pow(value / 500.0, 3)) : 0;
+                //fprintf("500 pace: %u (%u:%02u) power: %uW\n", value, value / 60 , value % 60, driver->values.power);
                 break;
             case WATERROWER_CALORIES:
                 value = (value + 500) / 1000;
