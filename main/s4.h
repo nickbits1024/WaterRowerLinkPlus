@@ -1,3 +1,7 @@
+#ifndef S4_H
+#define S4_H
+
+#include "heart_rate_manager.h"
 
 typedef struct
 {
@@ -17,9 +21,11 @@ typedef struct
     uint8_t timer_second_dec;
     uint8_t timer_minute;
     uint8_t timer_hour;
-} waterrower_values_t;
+} s4_values_t;
 
-typedef void* waterrower_handle_t;
+typedef void* s4_handle_t;
 
-esp_err_t waterrower_init(waterrower_handle_t* waterrower_handle);
-esp_err_t waterrower_get_values(waterrower_handle_t waterrower_handle, waterrower_values_t* values);
+esp_err_t s4_init(hrm_handle_t hrm_handle, s4_handle_t* waterrower_handle);
+esp_err_t s4_get_values(s4_handle_t waterrower_handle, s4_values_t* values);
+
+#endif

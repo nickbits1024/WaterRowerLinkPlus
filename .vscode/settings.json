@@ -29,6 +29,8 @@
         "type_traits": "c",
         "xlocmon": "c",
         "xlocnum": "c",
-        "xtr1common": "c"
+        "xtr1common": "c",
+        "s4.h": "c",
+        "heart_rate_manager.h": "c"
     }
 }
