@@ -11,6 +11,9 @@
 #define TAG "ant+"
 #define ANTPLUS_FE_DEVICE_NUM       62282
 
+#define ANTPLUS_HEART_RATE_TIMEOUT  (60 * 2)
+
+#define ANTPLUS_UART_BAUD_RATE      115200
 #define ANTPLUS_UART_NUM            UART_NUM_1
 #define ANTPLUS_UART_QUEUE_SIZE     10
 #define ANTPLUS_MAX_MESSAGE_SIZE    41
@@ -23,6 +26,14 @@
 
 #define ANTPLUS_RESET_GPIO_NUM      GPIO_NUM_15
 #define ANTPLUS_RESET_GPIO_SEL      GPIO_SEL_15
+
+// #define ANTPLUS_WATERROWER_UART_BAUD_RATE         2400
+// #define ANTPLUS_WATERROWER_UART_RX_BUFFER_SIZE    1024
+// #define ANTPLUS_WATERROWER_UART_TX_BUFFER_SIZE    0
+// #define ANTPLUS_WATERROWER_UART_NUM UART_NUM_2
+#define ANTPLUS_WATERROWER_TX_GPIO_NUM  GPIO_NUM_14
+#define ANTPLUS_WATERROWER_TX_GPIO_SEL  GPIO_SEL_14
+//#define ANTPLUS_WATERROWER_RX_GPIO_NUM  GPIO_NUM_13
 
 #define ANTPLUS_SYNC_BYTE_MASK      0xfe
 #define ANTPLUS_SYNC_BYTE_VALUE     0xa4
@@ -39,8 +50,8 @@
 #define ANTPLUS_FE                  17
 #define ANTPLUS_HRM                 120
 
-#define ANTPLUS_CHANNEL_FE          0
-#define ANTPLUS_CHANNEL_HRM         1
+#define ANTPLUS_CHANNEL_HRM         0
+#define ANTPLUS_CHANNEL_FE          1
 
 #define ANTPLUS_0DBM                3
 #define ANTPLUS_2457MHZ             57
@@ -69,6 +80,8 @@ typedef struct
     QueueHandle_t uart_queue_handle;
     TaskHandle_t recv_task_handle;
     uint8_t heart_rate;
+    uint64_t heart_rate_ts;
+    //uint8_t waterrower_uart_num;
 } 
 antplus_driver_t;
 
@@ -114,8 +127,8 @@ typedef struct
             struct 
             {
                 uint8_t reserved[3];
-                uint16_t hr_ts;
-                uint8_t hr_count;
+                uint16_t heart_beat_ts;
+                uint8_t heart_beat_count;
                 uint8_t hr;
             }
             __attribute__((packed)) common;
@@ -449,8 +462,9 @@ esp_err_t antplus_set_channel_tx_power(antplus_driver_t* driver, uint8_t channel
 esp_err_t antplus_set_channel_search_timeout(antplus_driver_t* driver, uint8_t channel, uint8_t time_out);
 esp_err_t antplus_open_channel(antplus_driver_t* driver, uint8_t channel);
 esp_err_t antplus_setup(antplus_driver_t* antplus_handle);
-esp_err_t antplus_set_heart_rate(antplus_handle_t antplus_handle, uint8_t hr);
+esp_err_t antplus_set_heart_rate(antplus_handle_t antplus_handle, uint8_t heart_rate, uint8_t heart_beat_count);
 void antplus_trainer_task(void* param);
+void antplus_waterrower_heart_rate_task(void* param);
 
 extern waterrower_handle_t waterrower_handle;
 
@@ -505,7 +519,7 @@ void antplus_decode_channel_broadcast_message(antplus_driver_t* driver, antplus_
             case 2:
             case 3:
             case 4:
-                antplus_set_heart_rate(driver, hr_msg->data.common.hr);
+                antplus_set_heart_rate(driver, hr_msg->data.common.hr, hr_msg->data.common.heart_beat_count);
                 break;
             }
         }
@@ -585,7 +599,7 @@ bool antplus_decode_message(antplus_driver_t* driver, uint8_t* packet, uint8_t p
         antplus_decode_channel_broadcast_message(driver, (antplus_broadcast_message_t*)msg);
         break;
     case ANTPLUS_ACKNOWEDGED_DATA:
-        ESP_LOGI(TAG, "data acknowledged channel %u", ((antplus_broadcast_message_t*)msg)->data.channel);
+        ESP_LOGI(TAG, "data acknowledged on channel %u", ((antplus_broadcast_message_t*)msg)->data.channel);
         break;
     default:
         ESP_LOGI(TAG, "unknown msg 0x%02x", msg->msg_id);
@@ -777,16 +791,18 @@ esp_err_t antplus_init(antplus_handle_t* antplus_handle)
 
     gpio_config(&io_conf);
 
-    // io_conf.pin_bit_mask = ANTPLUS_CTS_GPIO_SEL;
-    // io_conf.mode = GPIO_MODE_INPUT;
-    // io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    // io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    // io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.pin_bit_mask = ANTPLUS_WATERROWER_TX_GPIO_SEL;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;
 
-    // gpio_config(&io_conf);
+    gpio_config(&io_conf);
+
+    gpio_set_level(ANTPLUS_WATERROWER_TX_GPIO_NUM, 0);
 
     uart_config_t uart_config = {
-        .baud_rate = 115200,
+        .baud_rate = ANTPLUS_UART_BAUD_RATE,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -799,11 +815,31 @@ esp_err_t antplus_init(antplus_handle_t* antplus_handle)
     ESP_ERROR_CHECK(uart_driver_install(driver->uart_num,  ANTPLUS_UART_RX_BUFFER_SIZE, ANTPLUS_UART_TX_BUFFER_SIZE, 
         ANTPLUS_UART_QUEUE_SIZE, &driver->uart_queue_handle, 0));
 
+    //driver->waterrower_uart_num = ANTPLUS_WATERROWER_UART_NUM;
+
+    // uart_config_t waterrower_uart_config = {
+    //     .baud_rate = ANTPLUS_WATERROWER_UART_BAUD_RATE,
+    //     .data_bits = UART_DATA_8_BITS,
+    //     .parity = UART_PARITY_DISABLE,
+    //     .stop_bits = UART_STOP_BITS_1,
+    //     .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+    // };
+
+    // ESP_ERROR_CHECK(uart_param_config(driver->waterrower_uart_num, &waterrower_uart_config));
+    // ESP_ERROR_CHECK(uart_set_pin(driver->waterrower_uart_num, ANTPLUS_WATERROWER_TX_GPIO_NUM, ANTPLUS_WATERROWER_RX_GPIO_NUM, -1, -1));
+
+
+
+    // QueueHandle_t waterrower_uart_queue_handle;
+    // ESP_ERROR_CHECK(uart_driver_install(driver->waterrower_uart_num,  ANTPLUS_WATERROWER_UART_RX_BUFFER_SIZE, 
+    //     ANTPLUS_WATERROWER_UART_TX_BUFFER_SIZE, ANTPLUS_UART_QUEUE_SIZE, &waterrower_uart_queue_handle, 0));
+
     xTaskCreate(antplus_recv_task, "antplus_recv_task", 4096, driver, 23, &driver->recv_task_handle);
 
     ESP_ERROR_CHECK(antplus_reset(driver));
 
     xTaskCreate(antplus_trainer_task, "antplus_trainer_task", 4096, driver, 23, NULL);
+    xTaskCreate(antplus_waterrower_heart_rate_task, "antplus_waterrower_heart_rate_task", 4096, driver, 23, NULL);
 
     *antplus_handle = driver;
 
@@ -824,6 +860,33 @@ esp_err_t antplus_reset(antplus_handle_t antplus_handle)
     //vTaskDelay(500 / portTICK_PERIOD_MS);
 
     return ESP_OK;
+}
+
+void antplus_waterrower_heart_rate_task(void* param)
+{
+    antplus_driver_t* driver = (antplus_driver_t*)param;
+
+    for (;;)
+    {
+        uint8_t hr = driver->heart_rate;
+        if (hr > 0)
+        {
+            uint16_t hr_period = 60000 / hr;
+
+            gpio_set_level(ANTPLUS_WATERROWER_TX_GPIO_NUM, 1);
+            ets_delay_us(5000);
+            gpio_set_level(ANTPLUS_WATERROWER_TX_GPIO_NUM, 0);
+
+            //printf("hr %u period %u\n", hr, hr_period);
+
+            vTaskDelay((hr_period - 5) / portTICK_PERIOD_MS); 
+        }
+        else
+        {
+            gpio_set_level(ANTPLUS_WATERROWER_TX_GPIO_NUM, 0);
+            vTaskDelay(500 / portTICK_PERIOD_MS); 
+        }
+    }
 }
 
 void antplus_trainer_task(void* param)
@@ -916,11 +979,45 @@ esp_err_t antplus_setup(antplus_driver_t* driver)
     return ESP_OK;
 }
 
-esp_err_t antplus_set_heart_rate(antplus_handle_t antplus_handle, uint8_t hr)
+esp_err_t antplus_set_heart_rate(antplus_handle_t antplus_handle, uint8_t heart_rate, uint8_t heart_beat_count)
 {
+    static int64_t last_wr_hr_ts;
+    static bool last_flip;
+    static uint8_t last_heart_beat_count;
+
     antplus_driver_t* driver = (antplus_driver_t*)antplus_handle;
 
-    driver->heart_rate = hr;
+    driver->heart_rate = heart_rate;
+    driver->heart_rate_ts = esp_timer_get_time();
+
+    //if (driver->heart_rate_ts - last_wr_hr_ts > 200000llu)
+    // if (last_heart_beat_count != heart_beat_count)
+    // {
+    //     //int written = uart_write_bytes(driver->waterrower_uart_num, &hr, sizeof(hr));
+
+    //     gpio_set_level(ANTPLUS_WATERROWER_TX_GPIO_NUM, 0);
+    //     //vTaskDelay(5 / portTICK_PERIOD_MS);
+    //     ets_delay_us(5000);
+    //     gpio_set_level(ANTPLUS_WATERROWER_TX_GPIO_NUM, 1);
+    //     //gpio_set_level(ANTPLUS_WATERROWER_TX_GPIO_NUM, last_flip ? 1 : 0);
+    //     last_flip = !last_flip;
+
+    //     // char hr_text[5];
+    //     // snprintf(hr_text, sizeof(hr_text), "%u\n", hr);
+    //     // int written = uart_write_bytes(driver->waterrower_uart_num, hr_text, strlen(hr_text));
+        
+    //     //printf("wrote hr %u (%d bytes) to WR ANT+\n", hr, written);
+    //     printf("beat count %u flip %u\n", heart_beat_count, last_flip);
+
+    //     last_heart_beat_count = heart_beat_count;
+    //     last_wr_hr_ts = driver->heart_rate_ts;
+    // }
+
+    // //if (last_hr != hr)
+    // {
+
+    //     last_hr = hr;
+    // }
 
     return ESP_OK;
 }
@@ -929,5 +1026,14 @@ esp_err_t antplus_get_heart_rate(antplus_handle_t antplus_handle, uint8_t* hr)
 {
     antplus_driver_t* driver = (antplus_driver_t*)antplus_handle;
 
-    return driver->heart_rate;
+    if (esp_timer_get_time() - driver->heart_rate_ts < ANTPLUS_HEART_RATE_TIMEOUT * 1000000llu)
+    {
+        *hr = driver->heart_rate;
+    }
+    else
+    {
+        *hr = 0;
+    }
+
+    return ESP_OK;
 }

@@ -10,7 +10,7 @@
 
 #define TAG "waterrower"
 
-#define WATERROWER_INACTIVTY_TIMEOUT        (60 * 15)
+#define WATERROWER_INACTIVTY_TIMEOUT        (60 * 30)
 
 #define WATERROWER_MAX_PACKET_SIZE          64
 #define WATERROWER_USB_ENDPOINT_OUT_ADDRESS 0x03
@@ -197,10 +197,10 @@ static void waterrower_in_callback(usb_transfer_t* transfer)
 
     if (transfer->status != USB_TRANSFER_STATUS_COMPLETED)
     {
-        ESP_LOGI(TAG, "Inbound USB transfer failure %d", transfer->status);
+        ESP_LOGI(TAG, "Inbound USB transfer failure %d~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", transfer->status);
         if (transfer->status != USB_TRANSFER_STATUS_CANCELED)
         {
-            abort();
+            //abort();
         }
         return;
     }
@@ -240,7 +240,7 @@ static void waterrower_out_callback(usb_transfer_t* transfer)
 
     if (transfer->status != USB_TRANSFER_STATUS_COMPLETED)
     {
-        ESP_LOGI(TAG, "Output USB transfer failure %d", transfer->status);
+        ESP_LOGI(TAG, "Output USB transfer failure %d~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", transfer->status);
         if (transfer->status != USB_TRANSFER_STATUS_CANCELED)
         {
             abort();
@@ -406,9 +406,6 @@ esp_err_t waterrower_init(waterrower_handle_t* waterrower_handle)
 
     gpio_config(&io_conf);
 
-    // ESP_LOGI(TAG, "Waiting to power on...");
-    // vTaskDelay(10000 / portTICK_PERIOD_MS);
-    //ESP_LOGI(TAG, "Power on");
     gpio_set_level(WATERROWER_USB_POWER_GPIO_NUM, 0);
 
     io_conf.pin_bit_mask = WATERROWER_POWER_BUTTON_GPIO_SEL;

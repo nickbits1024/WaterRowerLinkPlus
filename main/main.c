@@ -606,9 +606,6 @@ void kill_notify_tasks(uint16_t gatts_if, uint16_t conn_id)
 
 void notify_hr_measurement(void* p)
 {
-    int hr = 60;
-    bool increase = true;
-
     esp_gatt_if_t gatts_if = ((intptr_t)p) >> 16;
     uint16_t conn_id = ((intptr_t)p) & 0xffff;
 
@@ -629,7 +626,7 @@ void notify_hr_measurement(void* p)
             hr_measurement_value[0] = heart_rate >> 8;
             hr_measurement_value[1] = heart_rate & 0xff;
 
-            ESP_LOGI(TAG, "ble hr %d", hr);
+            ESP_LOGI(TAG, "ble hr %d", heart_rate);
             esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
             if (ret != ESP_OK)
             {
@@ -712,8 +709,8 @@ void notify_ftms_rower_data(void* p)
         rower_data_value_value[18] = elapsed & 0xff;
         rower_data_value_value[19] = (elapsed >> 8) & 0xff;
 
-        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u (%06x) power: %u stroke_average: %u }", 
-            elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, calories, stroke_average);
+        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u, power: %u stroke_average: %u }", 
+            elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, stroke_average);
 
         ret = esp_ble_gatts_send_indicate(gatts_if, conn_id, ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
         if (ret != ESP_OK)
@@ -757,8 +754,9 @@ void notify_ftms_indoor_bike_data(void* p)
             break;
         }
 
-        uint16_t speed = values.current_speed * 100;
-        uint8_t cadence = values.stroke_rate_x2 / 2;
+        uint16_t speed = (uint16_t)(values.current_speed * 60 * 60 / 1000);
+        ets_printf("cm/s =%u km/h=%.1f\n", values.current_speed, speed / 100.0f);
+        uint8_t cadence = values.stroke_rate_x2;
         uint32_t distance = values.distance;
         uint16_t power = values.power;
         uint16_t calories = values.calories;
