@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "freertos/event_groups.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
@@ -327,6 +328,7 @@ esp_err_t antplus_init(hrm_handle_t* hrm_handle, s4_handle_t s4_handle, antplus_
     antplus_driver_t* driver = malloc(sizeof(antplus_driver_t));
     memset(driver, 0, sizeof(antplus_driver_t));
 
+    driver->eg_handle = xEventGroupCreate();
     driver->hrm_handle = hrm_handle;
     driver->s4_handle = s4_handle;
     driver->uart_num = ANTPLUS_UART_NUM;
@@ -371,6 +373,7 @@ esp_err_t antplus_reset(antplus_handle_t antplus_handle)
 {
     antplus_driver_t* driver = (antplus_driver_t*)antplus_handle;
 
+    xEventGroupClearBits(driver->eg_handle, ANTPLUS_EVENT_READY);
     ESP_ERROR_CHECK(uart_flush(driver->uart_num));
 
     ESP_ERROR_CHECK(gpio_set_level(ANTPLUS_RESET_GPIO_NUM, 0));
@@ -388,6 +391,8 @@ void antplus_trainer_task(void* param)
 
     for (uint8_t i = 0; ; i++)
     {
+        xEventGroupWaitBits(driver->eg_handle, ANTPLUS_EVENT_READY, pdFALSE, pdTRUE, portMAX_DELAY);
+
         s4_values_t values;
         if (s4_get_values(driver->s4_handle, &values) == ESP_OK)
         {
@@ -468,36 +473,7 @@ esp_err_t antplus_setup(antplus_driver_t* driver)
     antplus_set_channel_period(driver, ANTPLUS_CHANNEL_FE, 8192);
     antplus_set_channel_tx_power(driver, ANTPLUS_CHANNEL_FE, ANTPLUS_0DBM);
     antplus_open_channel(driver, ANTPLUS_CHANNEL_FE);
+    xEventGroupSetBits(driver->eg_handle, ANTPLUS_EVENT_READY);
 
     return ESP_OK;
 }
-
-// esp_err_t antplus_set_heart_rate(antplus_handle_t antplus_handle, uint8_t heart_rate, uint8_t heart_beat_count)
-// {
-//     static int64_t last_wr_hr_ts;
-//     static bool last_flip;
-//     static uint8_t last_heart_beat_count;
-
-//     antplus_driver_t* driver = (antplus_driver_t*)antplus_handle;
-
-//     driver->heart_rate = heart_rate;
-//     driver->heart_rate_ts = esp_timer_get_time();
-
-//     return ESP_OK;
-// }
-
-// esp_err_t antplus_get_heart_rate(antplus_handle_t antplus_handle, uint8_t* hr)
-// {
-//     antplus_driver_t* driver = (antplus_driver_t*)antplus_handle;
-
-//     if (esp_timer_get_time() - driver->heart_rate_ts < ANTPLUS_HEART_RATE_TIMEOUT * 1000000llu)
-//     {
-//         *hr = driver->heart_rate;
-//     }
-//     else
-//     {
-//         *hr = 0;
-//     }
-
-//     return ESP_OK;
-// }

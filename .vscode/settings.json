@@ -35,6 +35,7 @@
         "algorithm": "c",
         "iterator": "c",
         "xhash": "c",
-        "xtree": "c"
+        "xtree": "c",
+        "event_groups.h": "c"
     }
 }

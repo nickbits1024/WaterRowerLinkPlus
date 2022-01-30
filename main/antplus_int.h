@@ -26,60 +26,62 @@
 #define ANTPLUS_OPEN_CHANNEL                0x4b
 #define ANTPLUS_CHANNEL_RESPONSE            0x40
 
-#define ANTPLUS_FE_DEVICE_NUM       62282
+#define ANTPLUS_FE_DEVICE_NUM               62282
 
-#define ANTPLUS_UART_BAUD_RATE      115200
-#define ANTPLUS_UART_NUM            UART_NUM_1
-#define ANTPLUS_UART_QUEUE_SIZE     10
-#define ANTPLUS_MAX_MESSAGE_SIZE    41
-#define ANTPLUS_UART_RX_BUFFER_SIZE    1024
-#define ANTPLUS_UART_TX_BUFFER_SIZE    0
+#define ANTPLUS_UART_BAUD_RATE              115200
+#define ANTPLUS_UART_NUM                    UART_NUM_1
+#define ANTPLUS_UART_QUEUE_SIZE             10
+#define ANTPLUS_MAX_MESSAGE_SIZE            41
+#define ANTPLUS_UART_RX_BUFFER_SIZE         1024
+#define ANTPLUS_UART_TX_BUFFER_SIZE         0
 
-#define ANTPLUS_CTS_GPIO_NUM        GPIO_NUM_16
-#define ANTPLUS_TX_GPIO_NUM         GPIO_NUM_17
-#define ANTPLUS_RX_GPIO_NUM         GPIO_NUM_18
+#define ANTPLUS_CTS_GPIO_NUM                GPIO_NUM_16
+#define ANTPLUS_TX_GPIO_NUM                 GPIO_NUM_17
+#define ANTPLUS_RX_GPIO_NUM                 GPIO_NUM_18
 
-#define ANTPLUS_RESET_GPIO_NUM      GPIO_NUM_15
-#define ANTPLUS_RESET_GPIO_SEL      GPIO_SEL_15
+#define ANTPLUS_RESET_GPIO_NUM              GPIO_NUM_15
+#define ANTPLUS_RESET_GPIO_SEL              GPIO_SEL_15
 
-#define ANTPLUS_SYNC_BYTE_MASK      0xfe
-#define ANTPLUS_SYNC_BYTE_VALUE     0xa4
-#define ANTPLUS_SYNC_VALUE          0x52
+#define ANTPLUS_SYNC_BYTE_MASK              0xfe
+#define ANTPLUS_SYNC_BYTE_VALUE             0xa4
+#define ANTPLUS_SYNC_VALUE                  0x52
 
-#define ANTPLUS_PAGE_MASK           0x7f
+#define ANTPLUS_PAGE_MASK                   0x7f
 
-#define ANTPLUS_NETWORK_KEY         { 0xb9, 0xa5, 0x21, 0xfb, 0xbd, 0x72, 0xc3, 0x45 }
-#define ANTPLUS_NETWORK_KEY_SIZE    8
-#define ANTPLUS_BROADCAST_PAYLOAD_SIZE 8
+#define ANTPLUS_NETWORK_KEY                 { 0xb9, 0xa5, 0x21, 0xfb, 0xbd, 0x72, 0xc3, 0x45 }
+#define ANTPLUS_NETWORK_KEY_SIZE            8
+#define ANTPLUS_BROADCAST_PAYLOAD_SIZE      8
 
-#define ANTPLUS_PUBLIC_NETWORK      0
+#define ANTPLUS_PUBLIC_NETWORK              0
 
-#define ANTPLUS_FE                  17
-#define ANTPLUS_HRM                 120
+#define ANTPLUS_FE                          17
+#define ANTPLUS_HRM                         120
 
-#define ANTPLUS_CHANNEL_HRM         0
-#define ANTPLUS_CHANNEL_FE          1
+#define ANTPLUS_CHANNEL_HRM                 0
+#define ANTPLUS_CHANNEL_FE                  1
 
-#define ANTPLUS_0DBM                3
-#define ANTPLUS_2457MHZ             57
+#define ANTPLUS_0DBM                        3
+#define ANTPLUS_2457MHZ                     57
 
 #define ANTPLUS_BIDIRECTIONAL_RECEIVE       0
 #define ANTPLUS_BIDIRECTIONAL_TRANSMIT      0x10
-#define ANTPLUS_IC                  0x01
-#define ANTPLUS_GDP                 0x04
+#define ANTPLUS_IC                          0x01
+#define ANTPLUS_GDP                         0x04
 
 
-#define ANTPLUS_PAGE_MANUFACTURER_ID    80
-#define ANTPLUS_PAGE_PRODUCT_INFO       81
-#define ANTPLUS_PAGE_ROWING_DATA        22
-#define ANTPLUS_PAGE_GENERAL_FE         16
-#define ANTPLUS_ROWER                   22
-#define ANTPLUS_CAPS_HR_FE              0x03
-#define ANTPLUS_CAPS_HR_EM              0x02
-#define ANTPLUS_CAPS_HR_ANT             0x01
-#define ANTPLUS_CAPS_DISTANCE           0x04
-#define ANTPLUS_CAPS_VIRTUAL_SPEED      0x08
-#define ANTPLUS_CAPS_STROKES            0x01
+#define ANTPLUS_PAGE_MANUFACTURER_ID        80
+#define ANTPLUS_PAGE_PRODUCT_INFO           81
+#define ANTPLUS_PAGE_ROWING_DATA            22
+#define ANTPLUS_PAGE_GENERAL_FE             16
+#define ANTPLUS_ROWER                       22
+#define ANTPLUS_CAPS_HR_FE                  0x03
+#define ANTPLUS_CAPS_HR_EM                  0x02
+#define ANTPLUS_CAPS_HR_ANT                 0x01
+#define ANTPLUS_CAPS_DISTANCE               0x04
+#define ANTPLUS_CAPS_VIRTUAL_SPEED          0x08
+#define ANTPLUS_CAPS_STROKES                0x01
+
+#define ANTPLUS_EVENT_READY                 0x01
 
 typedef struct
 {
@@ -90,7 +92,8 @@ typedef struct
     uint64_t heart_rate_ts;
     hrm_handle_t hrm_handle;
     s4_handle_t s4_handle;
-} 
+    EventGroupHandle_t eg_handle;
+}
 antplus_driver_t;
 
 typedef struct

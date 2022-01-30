@@ -1,7 +1,6 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -298,15 +297,15 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
     {
         // GATTS
         case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
-            adv_config_done &= (~ADV_CONFIG_FLAG);
-            if (adv_config_done == 0)
+            driver->adv_config_done &= (~ADV_CONFIG_FLAG);
+            if (driver->adv_config_done == 0)
             {
                 esp_ble_gap_start_advertising(&adv_params);
             }
             break;
         case ESP_GAP_BLE_SCAN_RSP_DATA_RAW_SET_COMPLETE_EVT:
-            adv_config_done &= (~SCAN_RSP_CONFIG_FLAG);
-            if (adv_config_done == 0)
+            driver->adv_config_done &= (~SCAN_RSP_CONFIG_FLAG);
+            if (driver->adv_config_done == 0)
             {
                 esp_ble_gap_start_advertising(&adv_params);
             }
@@ -342,7 +341,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
                 param->update_conn_params.timeout);
             break;
 
-            // GATC
+        // GATC
         case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT:
         {
             esp_ble_gap_start_scanning(30);
@@ -405,20 +404,25 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
 
                     if (found_hr)
                     {
-                        ESP_LOGI(TAG, "found hr device");
-                        esp_log_buffer_hex(TAG, scan_result->scan_rst.bda, 6);
                         if (driver->hr_connected == false)
                         {
                             driver->hr_connected = true;
-                            ESP_LOGI(TAG, "connect to the remote device.");
+                            memcpy(driver->hr_remote_bda, scan_result->scan_rst.bda, sizeof(esp_bd_addr_t));
+
+                            ESP_LOGI(TAG, "connect to the hr device");
+                            esp_log_buffer_hex(TAG, driver->hr_remote_bda, sizeof(esp_bd_addr_t));
+
                             esp_ble_gap_stop_scanning();
                             esp_ble_gattc_open(driver->hr_gattc_if, scan_result->scan_rst.bda, scan_result->scan_rst.ble_addr_type, true);
                         }
                     }
                     break;
                 case ESP_GAP_SEARCH_INQ_CMPL_EVT:
-                    ESP_LOGI(TAG, "scanning...");
-                    esp_ble_gap_start_scanning(30);
+                    if (!driver->hr_connected)
+                    {
+                        ESP_LOGI(TAG, "scanning...");
+                        esp_ble_gap_start_scanning(30);
+                    }
                     break;
                 default:
                     break;
@@ -440,7 +444,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
     }
 }
 
-void create_notify_task(ble_driver_t* driver, uint16_t gatts_if, uint16_t conn_id, const char* task_name, TaskFunction_t task_func)
+void create_notify_task(ble_driver_t* driver, uint16_t gatts_if, esp_bd_addr_t remote_bda, uint16_t conn_id, const char* task_name, TaskFunction_t task_func)
 {
     bool task_found = false;
     bool task_created = false;
@@ -464,6 +468,7 @@ void create_notify_task(ble_driver_t* driver, uint16_t gatts_if, uint16_t conn_i
             {
                 notify_tasks[i].ctx.driver = driver;
                 notify_tasks[i].ctx.gatts_if = gatts_if;
+                memcpy(notify_tasks[i].ctx.remote_bda, remote_bda, sizeof(esp_bd_addr_t));
                 notify_tasks[i].ctx.conn_id = conn_id;
                 notify_tasks[i].task_name = task_name;
                 xTaskCreate(task_func, task_name, 4096, (void*)&notify_tasks[i].ctx, 23, &notify_tasks[i].task_handle);
@@ -492,7 +497,7 @@ void create_notify_task(ble_driver_t* driver, uint16_t gatts_if, uint16_t conn_i
     }
 }
 
-void kill_notify_task(uint16_t gatts_if, uint16_t conn_id, const char* task_name)
+void kill_notify_task(uint16_t gatts_if, esp_bd_addr_t remote_bda, uint16_t conn_id, const char* task_name)
 {
     for (int i = 0; i < BLE_NOTIFY_TASKS_MAX; i++)
     {
@@ -500,6 +505,7 @@ void kill_notify_task(uint16_t gatts_if, uint16_t conn_id, const char* task_name
         portENTER_CRITICAL(&notify_tasks_mux);
         if (notify_tasks[i].task_handle != NULL &&
             notify_tasks[i].ctx.gatts_if == gatts_if &&
+            memcmp(notify_tasks[i].ctx.remote_bda, remote_bda, sizeof(esp_bd_addr_t)) == 0 &&
             notify_tasks[i].ctx.conn_id == conn_id &&
             strcmp(notify_tasks[i].task_name, task_name) == 0)
         {
@@ -516,14 +522,16 @@ void kill_notify_task(uint16_t gatts_if, uint16_t conn_id, const char* task_name
 
 }
 
-void kill_notify_tasks(uint16_t gatts_if, uint16_t conn_id)
+void kill_notify_tasks(uint16_t gatts_if, esp_bd_addr_t remote_bda, uint16_t conn_id)
 {
     for (int i = 0; i < BLE_NOTIFY_TASKS_MAX; i++)
     {
         bool task_killed = false;
         const char* task_name;
         portENTER_CRITICAL(&notify_tasks_mux);
-        if (notify_tasks[i].ctx.gatts_if == gatts_if && notify_tasks[i].ctx.conn_id == conn_id)
+        if (notify_tasks[i].ctx.gatts_if == gatts_if && 
+            memcmp(notify_tasks[i].ctx.remote_bda, remote_bda, sizeof(esp_bd_addr_t)) == 0 &&
+            notify_tasks[i].ctx.conn_id == conn_id)
         {
             vTaskDelete(notify_tasks[i].task_handle);
             task_name = notify_tasks[i].task_name;
@@ -552,7 +560,7 @@ void notify_hr_measurement(void* p)
         hr_measurement_value[1] = heart_rate;
 
         ESP_LOGI(TAG, "ble hr %d", heart_rate);
-        esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
+        esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
         if (ret != ESP_OK)
         {
             ESP_LOGI(TAG, "HR notify error (%d)", ret);
@@ -618,7 +626,7 @@ void notify_ftms_rower_data(void* p)
         ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u, power: %u stroke_average: %u, hr %u }",
             elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, stroke_average, heart_rate);
 
-        ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
+        ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
         if (ret != ESP_OK)
         {
             break;
@@ -682,7 +690,7 @@ void notify_ftms_indoor_bike_data(void* p)
 
         ESP_LOGI(TAG, "ble indoor bike ftms: { timer: %u, distance: %u, cadence: %u }", elapsed, distance, cadence);
 
-        ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_VAL], sizeof(indoor_bike_data_value), indoor_bike_data_value, false);
+        ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_VAL], sizeof(indoor_bike_data_value), indoor_bike_data_value, false);
         if (ret != ESP_OK)
         {
             break;
@@ -736,7 +744,7 @@ void notify_csc_measurement(void* p)
 
             ESP_LOGI(TAG, "ble csc cranks %u ts %u", crank_revs, ts);
 
-            ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, csc_handle_table[IDX_CSC_MEASUREMENT_VAL], sizeof(csc_measurement_value), csc_measurement_value, false);
+            ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->csc_handle_table[IDX_CSC_MEASUREMENT_VAL], sizeof(csc_measurement_value), csc_measurement_value, false);
             if (ret != ESP_OK)
             {
                 break;
@@ -759,6 +767,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
     {
         case ESP_GATTS_REG_EVT:
         {
+            ESP_LOGI(TAG, "GATTS_REG_EVT, if = %u", gatts_if);
             esp_err_t set_dev_name_ret = esp_ble_gap_set_device_name(WATERROWER_DEVICE_NAME);
             if (set_dev_name_ret)
             {
@@ -769,9 +778,9 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             {
                 ESP_LOGE(TAG, "config raw adv data failed, error code = %x ", raw_adv_ret);
             }
-            adv_config_done |= ADV_CONFIG_FLAG;
+            driver->adv_config_done |= ADV_CONFIG_FLAG;
             // esp_err_t raw_scan_ret = esp_ble_gap_config_scan_rsp_data_raw(raw_scan_rsp_data, sizeof(raw_scan_rsp_data));
-            // if (raw_scan_ret)
+            // if (driver->raw_scan_ret)
             // {
             //     ESP_LOGE(TAG, "config raw scan rsp data failed, error code = %x", raw_scan_ret);
             // }
@@ -789,53 +798,54 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             {
                 // the data length of gattc write  must be less than GATTS_DEMO_CHAR_VAL_LEN_MAX.
                 ESP_LOGI(TAG, "GATT_WRITE_EVT, handle = %d, value len = %d, value :", param->write.handle, param->write.len);
-                esp_log_buffer_hex(TAG, param->write.value, param->write.len);
-                if (csc_handle_table[IDX_CSC_MEASUREMENT_CFG] == param->write.handle && param->write.len == 2)
+                //esp_log_buffer_hex(TAG, param->write.value, param->write.len);
+                esp_log_buffer_hex(TAG, param->write.bda, sizeof(esp_bd_addr_t));
+                if (driver->csc_handle_table[IDX_CSC_MEASUREMENT_CFG] == param->write.handle && param->write.len == 2)
                 {
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
-                        create_notify_task(driver, gatts_if, param->write.conn_id, "notify_csc_measurement", notify_csc_measurement);
+                        create_notify_task(driver, gatts_if, param->write.bda, param->write.conn_id, "notify_csc_measurement", notify_csc_measurement);
                     }
                     else
                     {
-                        kill_notify_task(gatts_if, param->write.conn_id, "notify_csc_measurement");
+                        kill_notify_task(gatts_if, param->write.bda, param->write.conn_id, "notify_csc_measurement");
                     }
                 }
-                else if (hr_handle_table[IDX_HR_MEASUREMENT_CFG] == param->write.handle && param->write.len == 2)
+                else if (driver->hr_handle_table[IDX_HR_MEASUREMENT_CFG] == param->write.handle && param->write.len == 2)
                 {
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
-                        create_notify_task(driver, gatts_if, param->write.conn_id, "notify_hr_measurement", notify_hr_measurement);
+                        create_notify_task(driver, gatts_if, param->write.bda, param->write.conn_id, "notify_hr_measurement", notify_hr_measurement);
                     }
                     else
                     {
-                        kill_notify_task(gatts_if, param->write.conn_id, "notify_hr_measurement");
+                        kill_notify_task(gatts_if, param->write.bda, param->write.conn_id, "notify_hr_measurement");
                     }
                 }
-                else if (ftms_handle_table[IDX_FTMS_ROWER_DATA_CFG] == param->write.handle && param->write.len == 2)
+                else if (driver->ftms_handle_table[IDX_FTMS_ROWER_DATA_CFG] == param->write.handle && param->write.len == 2)
                 {
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
-                        create_notify_task(driver, gatts_if, param->write.conn_id, "notify_rower_data", notify_ftms_rower_data);
+                        create_notify_task(driver, gatts_if, param->write.bda, param->write.conn_id, "notify_rower_data", notify_ftms_rower_data);
                     }
                     else
                     {
-                        kill_notify_task(gatts_if, param->write.conn_id, "notify_rower_data");
+                        kill_notify_task(gatts_if, param->write.bda, param->write.conn_id, "notify_rower_data");
                     }
                 }
-                else if (ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_CFG] == param->write.handle && param->write.len == 2)
+                else if (driver->ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_CFG] == param->write.handle && param->write.len == 2)
                 {
                     uint16_t descr_value = (param->write.value[1] << 8) | param->write.value[0];
                     if ((descr_value & 1) == 1)
                     {
-                        create_notify_task(driver, gatts_if, param->write.conn_id, "notify_indoor_bike_data", notify_ftms_indoor_bike_data);
+                        create_notify_task(driver, gatts_if, param->write.bda, param->write.conn_id, "notify_indoor_bike_data", notify_ftms_indoor_bike_data);
                     }
                     else
                     {
-                        ESP_LOGI(TAG, "kill indoor bike data notify %u %u", gatts_if, param->write.conn_id);
+                        kill_notify_task(gatts_if, param->write.bda, param->write.conn_id, "notify_indoor_bike_data");
                     }
                 }
                 else
@@ -865,7 +875,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             break;
         case ESP_GATTS_CONNECT_EVT:
         {
-            ESP_LOGI(TAG, "ESP_GATTS_CONNECT_EVT, conn_id = %d", param->connect.conn_id);
+            ESP_LOGI(TAG, "ESP_GATTS_CONNECT_EVT, conn_id = %d, if = %d", param->connect.conn_id, gatts_if);
             esp_log_buffer_hex(TAG, param->connect.remote_bda, 6);
             esp_ble_conn_update_params_t conn_params = { 0 };
             memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
@@ -881,8 +891,8 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             break;
         }
         case ESP_GATTS_DISCONNECT_EVT:
-            ESP_LOGI(TAG, "ESP_GATTS_DISCONNECT_EVT, conn_id = %u reason = 0x%x", param->disconnect.conn_id, param->disconnect.reason);
-            kill_notify_tasks(gatts_if, param->disconnect.conn_id);
+            ESP_LOGI(TAG, "ESP_GATTS_DISCONNECT_EVT, conn_id = %u, gatts_if = %u, reason = 0x%x", param->disconnect.conn_id, gatts_if, param->disconnect.reason);
+            kill_notify_tasks(gatts_if, param->disconnect.remote_bda, param->disconnect.conn_id);
             esp_ble_gap_start_advertising(&adv_params);
             break;
         case ESP_GATTS_CREAT_ATTR_TAB_EVT:
@@ -897,16 +907,16 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 switch (param->add_attr_tab.svc_inst_id)
                 {
                     case FTMS_SVC_INST_ID:
-                        memcpy(ftms_handle_table, param->add_attr_tab.handles, sizeof(ftms_handle_table));
-                        esp_ble_gatts_start_service(ftms_handle_table[IDX_FTMS_SVC]);
+                        memcpy(driver->ftms_handle_table, param->add_attr_tab.handles, sizeof(driver->ftms_handle_table));
+                        esp_ble_gatts_start_service(driver->ftms_handle_table[IDX_FTMS_SVC]);
                         break;
                     case HR_SVC_INST_ID:
-                        memcpy(hr_handle_table, param->add_attr_tab.handles, sizeof(hr_handle_table));
-                        esp_ble_gatts_start_service(hr_handle_table[IDX_HR_SVC]);
+                        memcpy(driver->hr_handle_table, param->add_attr_tab.handles, sizeof(driver->hr_handle_table));
+                        esp_ble_gatts_start_service(driver->hr_handle_table[IDX_HR_SVC]);
                         break;
                     case CSC_SVC_INST_ID:
-                        memcpy(csc_handle_table, param->add_attr_tab.handles, sizeof(csc_handle_table));
-                        esp_ble_gatts_start_service(csc_handle_table[IDX_CSC_SVC]);
+                        memcpy(driver->csc_handle_table, param->add_attr_tab.handles, sizeof(driver->csc_handle_table));
+                        esp_ble_gatts_start_service(driver->csc_handle_table[IDX_CSC_SVC]);
                         break;
                 }
             }
@@ -932,7 +942,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     switch (event)
     {
         case ESP_GATTC_REG_EVT:
-            ESP_LOGI(TAG, "REG_EVT");
+            ESP_LOGI(TAG, "GATTC_REG_EVT, if = %u", gattc_if);
             esp_err_t scan_ret = esp_ble_gap_set_scan_params(&ble_scan_params);
             if (scan_ret)
             {
@@ -942,16 +952,18 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
             break;
         case ESP_GATTC_CONNECT_EVT:
         {
-            ESP_LOGI(TAG, "ESP_GATTC_CONNECT_EVT conn_id %d, if %d", param->connect.conn_id, gattc_if);
-
-            driver->hr_conn_id = param->connect.conn_id;
-            memcpy(driver->hr_remote_bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
-            ESP_LOGI(TAG, "REMOTE BDA:");
-            esp_log_buffer_hex(TAG, driver->hr_remote_bda, sizeof(esp_bd_addr_t));
-            esp_err_t mtu_ret = esp_ble_gattc_send_mtu_req(gattc_if, param->connect.conn_id);
-            if (mtu_ret)
+            ESP_LOGI(TAG, "ESP_GATTC_CONNECT_EVT, conn_id = %d, if = %d", param->connect.conn_id, gattc_if);
+            esp_log_buffer_hex(TAG, param->connect.remote_bda, 6);
+            if (memcmp(driver->hr_remote_bda, param->connect.remote_bda, sizeof(esp_bd_addr_t)) == 0)
             {
-                ESP_LOGE(TAG, "config MTU error, error code = %x", mtu_ret);
+                driver->hr_conn_id = param->connect.conn_id;
+                ESP_LOGI(TAG, "hr device connected");
+
+                esp_err_t mtu_ret = esp_ble_gattc_send_mtu_req(gattc_if, param->connect.conn_id);
+                if (mtu_ret)
+                {
+                    ESP_LOGE(TAG, "config MTU error, error code = %x", mtu_ret);
+                }
             }
             break;
         }
@@ -1207,10 +1219,19 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
             ESP_LOGI(TAG, "write char success ");
             break;
         case ESP_GATTC_DISCONNECT_EVT:
-            driver->hr_connected = false;
-            driver->hr_server_found = false;
-            ESP_LOGI(TAG, "ESP_GATTC_DISCONNECT_EVT, reason = %d", param->disconnect.reason);
-            esp_ble_gap_start_scanning(30);
+            ESP_LOGI(TAG, "ESP_GATTC_DISCONNECT_EVT, conn_id = %x, reason = 0x%x", param->disconnect.conn_id, param->disconnect.reason);
+            esp_log_buffer_hex(TAG, param->disconnect.remote_bda, sizeof(esp_bd_addr_t));
+            ESP_LOGI(TAG, "hr_connected: %u, hr_conn_id: %x", driver->hr_connected, driver->hr_conn_id);
+            esp_log_buffer_hex(TAG, driver->hr_remote_bda, sizeof(esp_bd_addr_t));
+            if (driver->hr_connected && 
+                driver->hr_conn_id == param->disconnect.conn_id && 
+                memcmp(driver->hr_remote_bda, param->disconnect.remote_bda, sizeof(esp_bd_addr_t)) == 0)
+            {
+                driver->hr_connected = false;
+                driver->hr_server_found = false;
+                ESP_LOGI(TAG, "restarting hr scan...");
+                esp_ble_gap_start_scanning(30);
+            }
             break;
         default:
             break;
@@ -1247,8 +1268,8 @@ esp_err_t ble_init(hrm_handle_t hrm_handle, s4_handle_t s4_handle, ble_handle_t*
 
     ble_handler_driver = driver;
 
-    ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_APP_ID));
-    ESP_ERROR_CHECK(esp_ble_gattc_app_register(WATERROWER_APP_ID));
+    ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_SERVER_APP_ID));
+    ESP_ERROR_CHECK(esp_ble_gattc_app_register(WATERROWER_CLIENT_APP_ID));
 
     *ble_handle = driver;
 
