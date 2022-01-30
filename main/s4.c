@@ -186,6 +186,7 @@ static void s4_session_task(void* arg)
         }
         ESP_LOGI(TAG, "Power button pressed");
         gpio_set_level(S4_USB_POWER_GPIO_NUM, 1);
+        driver->power_on = true;
 
         xSemaphoreTake(driver->device_sem, portMAX_DELAY);
 
@@ -243,6 +244,7 @@ static void s4_session_task(void* arg)
         ESP_LOGI(TAG, "Inactivity detected. Shutting down...");
         ESP_ERROR_CHECK(s4_shutdown(driver));
         gpio_set_level(S4_USB_POWER_GPIO_NUM, 0);
+        driver->power_on = false;
 
         driver->dev_hdl = NULL;
     }
@@ -391,8 +393,14 @@ esp_err_t s4_get_values(s4_handle_t s4_handle, s4_values_t* values)
     if (s4_handle == NULL)
     {
         return ESP_ERR_INVALID_ARG;
-    }
+    }  
+
     s4_driver_t* driver = (s4_driver_t*)s4_handle;
+
+    if (!driver->power_on)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
 
     portENTER_CRITICAL(&driver->values_mux);
     memcpy(values, &driver->values, sizeof(s4_values_t));
@@ -610,7 +618,8 @@ static void s4_heart_beat_task(void* param)
     for (;;)
     {
         uint8_t hr;
-        if (hrm_get_rate(driver->hrm_handle, &hr) == ESP_OK && hr > 0)
+        if (driver->power_on &&
+            hrm_get_rate(driver->hrm_handle, &hr) == ESP_OK && hr > 0)
         {
             uint16_t hr_period = 60000 / hr;
 

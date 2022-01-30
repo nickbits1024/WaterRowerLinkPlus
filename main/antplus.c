@@ -396,6 +396,9 @@ void antplus_trainer_task(void* param)
         s4_values_t values;
         if (s4_get_values(driver->s4_handle, &values) == ESP_OK)
         {
+            uint8_t heart_rate;
+            hrm_get_rate(driver->hrm_handle, &heart_rate);
+
             antplus_broadcast_message_t msg = ANTPLUS_MESSAGE(antplus_broadcast_message_t, ANTPLUS_BROADCAST, ANTPLUS_INPUT);
             msg.data.channel = ANTPLUS_CHANNEL_FE;
 
@@ -437,7 +440,7 @@ void antplus_trainer_task(void* param)
                 page->data.elasped = ((uint32_t)(values.timer * 4)) % 256;
                 page->data.distance = (values.distance % 256);
                 page->data.speed = values.current_speed * 10;
-                page->data.heart_rate = driver->heart_rate;
+                page->data.heart_rate = heart_rate;
                 page->data.flags = ANTPLUS_CAPS_HR_ANT | ANTPLUS_CAPS_DISTANCE;
             }
 

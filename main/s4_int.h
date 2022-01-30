@@ -77,4 +77,5 @@ typedef struct
     TaskHandle_t out_transfer_task_handle;
 
     hrm_handle_t hrm_handle;
+    bool power_on;
 } s4_driver_t;

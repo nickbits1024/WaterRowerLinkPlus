@@ -88,8 +88,8 @@ typedef struct
     uint8_t uart_num;
     QueueHandle_t uart_queue_handle;
     TaskHandle_t recv_task_handle;
-    uint8_t heart_rate;
-    uint64_t heart_rate_ts;
+    //uint8_t heart_rate;
+    //uint64_t heart_rate_ts;
     hrm_handle_t hrm_handle;
     s4_handle_t s4_handle;
     EventGroupHandle_t eg_handle;

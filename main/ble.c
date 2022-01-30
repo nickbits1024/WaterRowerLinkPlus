@@ -560,6 +560,7 @@ void notify_hr_measurement(void* p)
         hr_measurement_value[1] = heart_rate;
 
         ESP_LOGI(TAG, "ble hr %d", heart_rate);
+
         esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
         if (ret != ESP_OK)
         {
@@ -575,138 +576,124 @@ void notify_ftms_rower_data(void* p)
 {
     notify_task_context_t* ctx = (notify_task_context_t*)p;
 
-    esp_err_t ret;
-
     for (;;)
     {
         s4_values_t values;
-        ret = s4_get_values(ctx->driver->s4_handle, &values);
-        if (ret != ESP_OK)
+        if (s4_get_values(ctx->driver->s4_handle, &values) == ESP_OK)
         {
-            break;
-        }
+            uint8_t stroke_rate = values.stroke_rate_x2;
+            uint16_t stroke_count = values.stroke_count;
+            uint8_t stroke_average = values.stroke_average;
+            uint32_t distance = values.distance;
+            uint16_t pace = values.current_speed != 0 ? 500 * 100 / values.current_speed : 0;
+            uint16_t power = values.power;
+            uint16_t calories = values.calories;
+            uint16_t cal_hour = 0xffff;
+            uint8_t cal_min = 0xff;
+            uint16_t elapsed = (uint16_t)(int)values.timer;
 
-        uint8_t stroke_rate = values.stroke_rate_x2;
-        uint16_t stroke_count = values.stroke_count;
-        uint8_t stroke_average = values.stroke_average;
-        uint32_t distance = values.distance;
-        uint16_t pace = values.current_speed != 0 ? 500 * 100 / values.current_speed : 0;
-        uint16_t power = values.power;
-        uint16_t calories = values.calories;
-        uint16_t cal_hour = 0xffff;
-        uint8_t cal_min = 0xff;
-        uint16_t elapsed = (uint16_t)(int)values.timer;
+            uint8_t heart_rate;
+            hrm_get_rate(ctx->driver->hrm_handle, &heart_rate);
 
-        uint8_t heart_rate;
-        hrm_get_rate(ctx->driver->hrm_handle, &heart_rate);
+            uint8_t rower_data_value_value[20];
 
-        uint8_t rower_data_value_value[20];
+            rower_data_value_value[0] = FTMS_ROWER_TOTAL_DISTANCE | FTMS_ROWER_INSTANTANEOUS_PACE | FTMS_ROWER_INSTANTANEOUS_POWER;
+            rower_data_value_value[1] = (FTMS_ROWER_EXPENDED_ENERGY | FTMS_ROWER_HEART_RATE | FTMS_ROWER_ELAPSED_TIME) >> 8;
+            rower_data_value_value[2] = stroke_rate & 0xff;
+            rower_data_value_value[3] = stroke_count & 0xff;
+            rower_data_value_value[4] = (stroke_count >> 8) & 0xff;
+            rower_data_value_value[5] = distance & 0xff;
+            rower_data_value_value[6] = (distance >> 8) & 0xff;
+            rower_data_value_value[7] = (distance >> 16) & 0xff;
+            rower_data_value_value[8] = pace & 0xff;
+            rower_data_value_value[9] = (pace >> 8) & 0xff;
+            rower_data_value_value[10] = power & 0xff;
+            rower_data_value_value[11] = (power >> 8) & 0xff;
+            rower_data_value_value[12] = calories & 0xff;
+            rower_data_value_value[13] = (calories >> 8) & 0xff;
+            rower_data_value_value[14] = cal_hour & 0xff;
+            rower_data_value_value[15] = (cal_hour >> 8) & 0xff;
+            rower_data_value_value[16] = cal_min & 0xff;
+            rower_data_value_value[17] = heart_rate & 0xff;
+            rower_data_value_value[18] = elapsed & 0xff;
+            rower_data_value_value[19] = (elapsed >> 8) & 0xff;
 
-        rower_data_value_value[0] = FTMS_ROWER_TOTAL_DISTANCE | FTMS_ROWER_INSTANTANEOUS_PACE | FTMS_ROWER_INSTANTANEOUS_POWER;
-        rower_data_value_value[1] = (FTMS_ROWER_EXPENDED_ENERGY | FTMS_ROWER_HEART_RATE | FTMS_ROWER_ELAPSED_TIME) >> 8;
-        rower_data_value_value[2] = stroke_rate & 0xff;
-        rower_data_value_value[3] = stroke_count & 0xff;
-        rower_data_value_value[4] = (stroke_count >> 8) & 0xff;
-        rower_data_value_value[5] = distance & 0xff;
-        rower_data_value_value[6] = (distance >> 8) & 0xff;
-        rower_data_value_value[7] = (distance >> 16) & 0xff;
-        rower_data_value_value[8] = pace & 0xff;
-        rower_data_value_value[9] = (pace >> 8) & 0xff;
-        rower_data_value_value[10] = power & 0xff;
-        rower_data_value_value[11] = (power >> 8) & 0xff;
-        rower_data_value_value[12] = calories & 0xff;
-        rower_data_value_value[13] = (calories >> 8) & 0xff;
-        rower_data_value_value[14] = cal_hour & 0xff;
-        rower_data_value_value[15] = (cal_hour >> 8) & 0xff;
-        rower_data_value_value[16] = cal_min & 0xff;
-        rower_data_value_value[17] = heart_rate & 0xff;
-        rower_data_value_value[18] = elapsed & 0xff;
-        rower_data_value_value[19] = (elapsed >> 8) & 0xff;
+            ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u, power: %u stroke_average: %u, hr %u }",
+                elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, stroke_average, heart_rate);
 
-        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u, power: %u stroke_average: %u, hr %u }",
-            elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, stroke_average, heart_rate);
-
-        ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
-        if (ret != ESP_OK)
-        {
-            break;
+            esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
+            if (ret != ESP_OK)
+            {
+                ESP_LOGI(TAG, "ble ftms rower data notify error (%d)", ret);
+                vTaskDelete(NULL);
+            }
         }
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    ESP_LOGI(TAG, "ble ftms rower data notify error (%d)", ret);
-    vTaskDelete(NULL);
 }
 
 void notify_ftms_indoor_bike_data(void* p)
 {
     notify_task_context_t* ctx = (notify_task_context_t*)p;
 
-    esp_err_t ret;
-
     for (;;)
     {
         s4_values_t values;
-        ret = s4_get_values(ctx->driver->s4_handle, &values);
-        if (ret != ESP_OK)
+        if (s4_get_values(ctx->driver->s4_handle, &values) == ESP_OK)
         {
-            break;
-        }
+            uint16_t speed = (uint16_t)(values.current_speed * 60 * 60 / 1000);
+            ets_printf("cm/s =%u km/h=%.1f\n", values.current_speed, speed / 100.0f);
+            uint8_t cadence = values.stroke_rate_x2;
+            uint32_t distance = values.distance;
+            uint16_t power = values.power;
+            uint16_t calories = values.calories;
+            uint16_t cal_hour = 0xffff;
+            uint8_t cal_min = 0xff;
+            uint16_t elapsed = (uint16_t)(int)values.timer;
 
-        uint16_t speed = (uint16_t)(values.current_speed * 60 * 60 / 1000);
-        ets_printf("cm/s =%u km/h=%.1f\n", values.current_speed, speed / 100.0f);
-        uint8_t cadence = values.stroke_rate_x2;
-        uint32_t distance = values.distance;
-        uint16_t power = values.power;
-        uint16_t calories = values.calories;
-        uint16_t cal_hour = 0xffff;
-        uint8_t cal_min = 0xff;
-        uint16_t elapsed = (uint16_t)(int)values.timer;
+            uint8_t heart_rate;
+            hrm_get_rate(ctx->driver->hrm_handle, &heart_rate);
 
-        uint8_t heart_rate;
-        hrm_get_rate(ctx->driver->hrm_handle, &heart_rate);
+            uint8_t indoor_bike_data_value[19];
 
-        uint8_t indoor_bike_data_value[19];
+            indoor_bike_data_value[0] = FTMS_INDOOR_BIKE_TOTAL_DISTANCE | FTMS_INDOOR_BIKE_INSTANTANEOUS_CADENCE | FTMS_INDOOR_BIKE_INSTANTANEOUS_POWER;
+            indoor_bike_data_value[1] = (FTMS_INDOOR_BIKE_EXPENDED_ENERGY | FTMS_INDOOR_BIKE_HEART_RATE | FTMS_INDOOR_BIKE_ELAPSED_TIME) >> 8;
+            indoor_bike_data_value[2] = speed & 0xff;
+            indoor_bike_data_value[3] = (speed >> 8) & 0xff;
+            indoor_bike_data_value[4] = cadence & 0xff;
+            indoor_bike_data_value[5] = (cadence >> 8) & 0xff;
+            indoor_bike_data_value[6] = distance & 0xff;
+            indoor_bike_data_value[7] = (distance >> 8) & 0xff;
+            indoor_bike_data_value[8] = (distance >> 16) & 0xff;
+            indoor_bike_data_value[9] = power & 0xff;
+            indoor_bike_data_value[10] = (power >> 8) & 0xff;
+            indoor_bike_data_value[11] = calories & 0xff;
+            indoor_bike_data_value[12] = (calories >> 8) & 0xff;
+            indoor_bike_data_value[13] = cal_hour & 0xff;
+            indoor_bike_data_value[14] = (cal_hour >> 8) & 0xff;
+            indoor_bike_data_value[15] = cal_min & 0xff;
+            indoor_bike_data_value[16] = heart_rate & 0xff;
+            indoor_bike_data_value[17] = elapsed & 0xff;
+            indoor_bike_data_value[18] = (elapsed >> 8) & 0xff;
 
-        indoor_bike_data_value[0] = FTMS_INDOOR_BIKE_TOTAL_DISTANCE | FTMS_INDOOR_BIKE_INSTANTANEOUS_CADENCE | FTMS_INDOOR_BIKE_INSTANTANEOUS_POWER;
-        indoor_bike_data_value[1] = (FTMS_INDOOR_BIKE_EXPENDED_ENERGY | FTMS_INDOOR_BIKE_HEART_RATE | FTMS_INDOOR_BIKE_ELAPSED_TIME) >> 8;
-        indoor_bike_data_value[2] = speed & 0xff;
-        indoor_bike_data_value[3] = (speed >> 8) & 0xff;
-        indoor_bike_data_value[4] = cadence & 0xff;
-        indoor_bike_data_value[5] = (cadence >> 8) & 0xff;
-        indoor_bike_data_value[6] = distance & 0xff;
-        indoor_bike_data_value[7] = (distance >> 8) & 0xff;
-        indoor_bike_data_value[8] = (distance >> 16) & 0xff;
-        indoor_bike_data_value[9] = power & 0xff;
-        indoor_bike_data_value[10] = (power >> 8) & 0xff;
-        indoor_bike_data_value[11] = calories & 0xff;
-        indoor_bike_data_value[12] = (calories >> 8) & 0xff;
-        indoor_bike_data_value[13] = cal_hour & 0xff;
-        indoor_bike_data_value[14] = (cal_hour >> 8) & 0xff;
-        indoor_bike_data_value[15] = cal_min & 0xff;
-        indoor_bike_data_value[16] = heart_rate & 0xff;
-        indoor_bike_data_value[17] = elapsed & 0xff;
-        indoor_bike_data_value[18] = (elapsed >> 8) & 0xff;
+            ESP_LOGI(TAG, "ble indoor bike ftms: { timer: %u, distance: %u, cadence: %u }", elapsed, distance, cadence);
 
-        ESP_LOGI(TAG, "ble indoor bike ftms: { timer: %u, distance: %u, cadence: %u }", elapsed, distance, cadence);
-
-        ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_VAL], sizeof(indoor_bike_data_value), indoor_bike_data_value, false);
-        if (ret != ESP_OK)
-        {
-            break;
+            esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_VAL], sizeof(indoor_bike_data_value), indoor_bike_data_value, false);
+            if (ret != ESP_OK)
+            {
+                ESP_LOGI(TAG, "ble ftms rower data notify error (%d)", ret);
+                vTaskDelete(NULL);
+            }
         }
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    ESP_LOGI(TAG, "ble ftms rower data notify error (%d)", ret);
-    vTaskDelete(NULL);
 }
 
 void notify_csc_measurement(void* p)
 {
     notify_task_context_t* ctx = (notify_task_context_t*)p;
-
-    esp_err_t ret;
 
     uint16_t last_crank_revs = 0;
     uint16_t first_stroke_count;
@@ -715,48 +702,43 @@ void notify_csc_measurement(void* p)
     for (int i = 0;; i++)
     {
         s4_values_t values;
-        ret = s4_get_values(ctx->driver->s4_handle, &values);
-        if (ret != ESP_OK)
+        if (s4_get_values(ctx->driver->s4_handle, &values) == ESP_OK)
         {
-            break;
-        }
+            int64_t now = esp_timer_get_time() / 1000 * 1024 / 1000;
 
-        int64_t now = esp_timer_get_time() / 1000 * 1024 / 1000;
-
-        if (i == 0)
-        {
-            first_stroke_count = values.stroke_start_count;
-            first_ts = values.last_stroke_start_ts;
-        }
-
-        uint16_t crank_revs = values.stroke_start_count - first_stroke_count;
-        uint16_t ts = (values.last_stroke_start_ts - first_ts) / 1000 * 1024 / 1000;
-
-        if (crank_revs != last_crank_revs)
-        {
-            uint8_t csc_measurement_value[5];
-
-            csc_measurement_value[0] = 0x02;
-            csc_measurement_value[1] = crank_revs & 0xff;
-            csc_measurement_value[2] = (crank_revs >> 8) & 0xff;
-            csc_measurement_value[3] = ts & 0xff;
-            csc_measurement_value[4] = (ts >> 8) & 0xff;
-
-            ESP_LOGI(TAG, "ble csc cranks %u ts %u", crank_revs, ts);
-
-            ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->csc_handle_table[IDX_CSC_MEASUREMENT_VAL], sizeof(csc_measurement_value), csc_measurement_value, false);
-            if (ret != ESP_OK)
+            if (i == 0)
             {
-                break;
+                first_stroke_count = values.stroke_start_count;
+                first_ts = values.last_stroke_start_ts;
             }
-            last_crank_revs = crank_revs;
+
+            uint16_t crank_revs = values.stroke_start_count - first_stroke_count;
+            uint16_t ts = (values.last_stroke_start_ts - first_ts) / 1000 * 1024 / 1000;
+
+            if (crank_revs != last_crank_revs)
+            {
+                uint8_t csc_measurement_value[5];
+
+                csc_measurement_value[0] = 0x02;
+                csc_measurement_value[1] = crank_revs & 0xff;
+                csc_measurement_value[2] = (crank_revs >> 8) & 0xff;
+                csc_measurement_value[3] = ts & 0xff;
+                csc_measurement_value[4] = (ts >> 8) & 0xff;
+
+                ESP_LOGI(TAG, "ble csc cranks %u ts %u", crank_revs, ts);
+
+                esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->csc_handle_table[IDX_CSC_MEASUREMENT_VAL], sizeof(csc_measurement_value), csc_measurement_value, false);
+                if (ret != ESP_OK)
+                {
+                    ESP_LOGI(TAG, "CSC notify error (%d)", ret);
+                    vTaskDelete(NULL);
+                }
+                last_crank_revs = crank_revs;
+            }
         }
 
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }
-
-    ESP_LOGI(TAG, "CSC notify error (%d)", ret);
-    vTaskDelete(NULL);
 }
 
 static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t* param)
@@ -1151,7 +1133,7 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         case ESP_GATTC_NOTIFY_EVT:
             if (param->notify.handle == driver->hr_char_handle)
             {
-                esp_log_buffer_hex(TAG, param->notify.value, param->notify.value_len);
+                //esp_log_buffer_hex(TAG, param->notify.value, param->notify.value_len);
                 if (param->notify.value_len >= 2)
                 {
                     uint8_t format = param->notify.value[0] & HEARTRATE_MEASUREMENT_FORMAT_MASK;
