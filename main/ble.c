@@ -6,9 +6,9 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
-
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
+#include "esp_gattc_api.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 #include "s4.h"
@@ -52,9 +52,34 @@ static esp_ble_adv_params_t adv_params = {
     .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
+static esp_ble_scan_params_t ble_scan_params = {
+    .scan_type = BLE_SCAN_TYPE_PASSIVE,
+    .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
+    .scan_filter_policy = BLE_SCAN_FILTER_ALLOW_ALL,
+    .scan_interval = 0x50,
+    .scan_window = 0x30,
+    .scan_duplicate = BLE_SCAN_DUPLICATE_DISABLE
+};
+
+static esp_bt_uuid_t remote_filter_service_uuid = {
+    .len = ESP_UUID_LEN_16,
+    .uuid = {.uuid16 = ESP_GATT_UUID_HEART_RATE_SVC },
+};
+
+static esp_bt_uuid_t remote_filter_char_uuid = {
+    .len = ESP_UUID_LEN_16,
+    .uuid = {.uuid16 = ESP_GATT_HEART_RATE_MEAS },
+};
+
+static esp_bt_uuid_t notify_descr_uuid = {
+    .len = ESP_UUID_LEN_16,
+    .uuid = {.uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG },
+};
+
+
 notify_task_t notify_tasks[BLE_NOTIFY_TASKS_MAX];
 portMUX_TYPE notify_tasks_mux = portMUX_INITIALIZER_UNLOCKED;
-ble_driver_t* gatts_profile_event_handler_driver;
+ble_driver_t* ble_handler_driver;
 
 static const uint16_t cycling_speed_cadence_svc_uuid = ESP_GATT_UUID_CYCLING_SPEED_CADENCE_SVC;
 static const uint16_t csc_measurement_uuid = ESP_GATT_UUID_CSC_MEASUREMENT;
@@ -97,8 +122,15 @@ static const uint8_t ftms_indoor_bike_data_ccc[2] = { 0x00, 0x00 };
 
 static const uint8_t ftms_feature_value[8] =
 {
-    0b00100110, 0b01010110, 0b00000000, 0b00000000,
-    0b00000000, 0b00000000, 0b00000000, 0b00000000,
+    FTMS_FEATURE_CADENCE_SUPPORTED | 
+    FTMS_FEATURE_TOTAL_DISTANCE_SUPPORTED | 
+    FTMS_FEATURE_PACE_SUPPORTED,
+    (FTMS_FEATURE_EXPENDED_ENERGY_SUPPORTED | 
+    FTMS_FEATURE_HEART_RATE_MEASUREMENT_SUPPORTED | 
+    FTMS_FEATURE_ELAPSED_TIME_SUPPORTED |
+    FTMS_FEATURE_POWER_MEASUREMENT_SUPPORTED) >> 8,
+    0, 0,
+    0, 0, 0, 0
 };
 
 
@@ -256,8 +288,15 @@ static const esp_gatts_attr_db_t gatt_hr_db[HR_IDX_NB] =
 
 static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* param)
 {
+    ble_driver_t* driver = ble_handler_driver;
+
+    uint16_t* service_ids;
+    uint8_t service_ids_size;
+    bool found_hr = false;
+
     switch (event)
     {
+        // GATTS
         case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
             adv_config_done &= (~ADV_CONFIG_FLAG);
             if (adv_config_done == 0)
@@ -302,6 +341,100 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
                 param->update_conn_params.latency,
                 param->update_conn_params.timeout);
             break;
+
+            // GATC
+        case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT:
+        {
+            esp_ble_gap_start_scanning(30);
+            break;
+        }
+        case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT:
+            //scan start complete event to indicate scan start successfully or failed
+            if (param->scan_start_cmpl.status != ESP_BT_STATUS_SUCCESS)
+            {
+                ESP_LOGE(TAG, "scan start failed, error status = %x", param->scan_start_cmpl.status);
+                break;
+            }
+            ESP_LOGI(TAG, "scan start success");
+
+            break;
+        case ESP_GAP_BLE_SCAN_RESULT_EVT:
+        {
+            esp_ble_gap_cb_param_t* scan_result = (esp_ble_gap_cb_param_t*)param;
+            switch (scan_result->scan_rst.search_evt)
+            {
+                case ESP_GAP_SEARCH_INQ_RES_EVT:
+                    service_ids = (uint16_t*)esp_ble_resolve_adv_data(scan_result->scan_rst.ble_adv, ESP_BLE_AD_TYPE_16SRV_CMPL, &service_ids_size);
+                    if (service_ids != NULL && service_ids_size != 0)
+                    {
+                        // esp_log_buffer_hex(TAG, scan_result->scan_rst.bda, 6);
+
+                        // printf("complete service ids: ");
+                        uint8_t service_ids_length = service_ids_size / sizeof(uint16_t);
+                        for (int i = 0; i < service_ids_length; i++)
+                        {
+                            //printf(" %02x", service_ids[i]);
+                            if (service_ids[i] == ESP_GATT_UUID_HEART_RATE_SVC)
+                            {
+                                found_hr = true;
+                            }
+                        }
+                        // printf("\n");
+                    }
+                    else
+                    {
+                        service_ids = (uint16_t*)esp_ble_resolve_adv_data(scan_result->scan_rst.ble_adv, ESP_BLE_AD_TYPE_16SRV_PART, &service_ids_size);
+                        if (service_ids != NULL && service_ids_size != 0)
+                        {
+                            // esp_log_buffer_hex(TAG, scan_result->scan_rst.bda, 6);
+
+                            // printf("partial service ids: ");
+
+                            uint8_t service_ids_length = service_ids_size / sizeof(uint16_t);
+                            for (int i = 0; i < service_ids_length; i++)
+                            {
+                                //printf(" %02x", service_ids[i]);
+                                if (service_ids[i] == ESP_GATT_UUID_HEART_RATE_SVC)
+                                {
+                                    found_hr = true;
+                                }
+                            }
+                            // printf("\n");
+                        }
+                    }
+
+                    if (found_hr)
+                    {
+                        ESP_LOGI(TAG, "found hr device");
+                        esp_log_buffer_hex(TAG, scan_result->scan_rst.bda, 6);
+                        if (driver->hr_connected == false)
+                        {
+                            driver->hr_connected = true;
+                            ESP_LOGI(TAG, "connect to the remote device.");
+                            esp_ble_gap_stop_scanning();
+                            esp_ble_gattc_open(driver->hr_gattc_if, scan_result->scan_rst.bda, scan_result->scan_rst.ble_addr_type, true);
+                        }
+                    }
+                    break;
+                case ESP_GAP_SEARCH_INQ_CMPL_EVT:
+                    ESP_LOGI(TAG, "scanning...");
+                    esp_ble_gap_start_scanning(30);
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
+
+        case ESP_GAP_BLE_SCAN_STOP_COMPLETE_EVT:
+            if (param->scan_stop_cmpl.status != ESP_BT_STATUS_SUCCESS)
+            {
+                ESP_LOGE(TAG, "scan stop failed, error status = %x", param->scan_stop_cmpl.status);
+                break;
+            }
+            ESP_LOGI(TAG, "stop scan successfully");
+            break;
+
         default:
             break;
     }
@@ -415,8 +548,8 @@ void notify_hr_measurement(void* p)
         hrm_get_rate(ctx->driver->hrm_handle, &heart_rate);
 
         uint8_t hr_measurement_value[2];
-        hr_measurement_value[0] = heart_rate >> 8;
-        hr_measurement_value[1] = heart_rate & 0xff;
+        hr_measurement_value[0] = HEARTRATE_MEASUREMENT_FORMAT_8BIT | HEARTRATE_MEASUREMENT_SENSOR_CONTACT_DETECTED;
+        hr_measurement_value[1] = heart_rate;
 
         ESP_LOGI(TAG, "ble hr %d", heart_rate);
         esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
@@ -426,7 +559,7 @@ void notify_hr_measurement(void* p)
             vTaskDelete(NULL);
         }
 
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -445,7 +578,7 @@ void notify_ftms_rower_data(void* p)
             break;
         }
 
-        uint8_t stroke_rate = values.stroke_rate_x2;        
+        uint8_t stroke_rate = values.stroke_rate_x2;
         uint16_t stroke_count = values.stroke_count;
         uint8_t stroke_average = values.stroke_average;
         uint32_t distance = values.distance;
@@ -482,8 +615,8 @@ void notify_ftms_rower_data(void* p)
         rower_data_value_value[18] = elapsed & 0xff;
         rower_data_value_value[19] = (elapsed >> 8) & 0xff;
 
-        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u, power: %u stroke_average: %u }", 
-            elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, stroke_average);
+        ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u, power: %u stroke_average: %u, hr %u }",
+            elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, stroke_average, heart_rate);
 
         ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
         if (ret != ESP_OK)
@@ -620,7 +753,7 @@ void notify_csc_measurement(void* p)
 
 static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t* param)
 {
-    ble_driver_t* driver = gatts_profile_event_handler_driver;
+    ble_driver_t* driver = ble_handler_driver;
 
     switch (event)
     {
@@ -716,11 +849,11 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                 }
             }
             break;
-        // case ESP_GATTS_EXEC_WRITE_EVT:
-        //     // the length of gattc prepare write data must be less than GATTS_DEMO_CHAR_VAL_LEN_MAX. 
-        //     ESP_LOGI(TAG, "ESP_GATTS_EXEC_WRITE_EVT");
-        //     example_exec_write_event_env(&prepare_write_env, param);
-        //     break;
+            // case ESP_GATTS_EXEC_WRITE_EVT:
+            //     // the length of gattc prepare write data must be less than GATTS_DEMO_CHAR_VAL_LEN_MAX. 
+            //     ESP_LOGI(TAG, "ESP_GATTS_EXEC_WRITE_EVT");
+            //     example_exec_write_event_env(&prepare_write_env, param);
+            //     break;
         case ESP_GATTS_MTU_EVT:
             ESP_LOGI(TAG, "ESP_GATTS_MTU_EVT, MTU %d", param->mtu.mtu);
             break;
@@ -792,6 +925,299 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
     }
 }
 
+static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t* param)
+{
+    ble_driver_t* driver = ble_handler_driver;
+
+    switch (event)
+    {
+        case ESP_GATTC_REG_EVT:
+            ESP_LOGI(TAG, "REG_EVT");
+            esp_err_t scan_ret = esp_ble_gap_set_scan_params(&ble_scan_params);
+            if (scan_ret)
+            {
+                ESP_LOGE(TAG, "set scan params error, error code = %x", scan_ret);
+            }
+            driver->hr_gattc_if = gattc_if;
+            break;
+        case ESP_GATTC_CONNECT_EVT:
+        {
+            ESP_LOGI(TAG, "ESP_GATTC_CONNECT_EVT conn_id %d, if %d", param->connect.conn_id, gattc_if);
+
+            driver->hr_conn_id = param->connect.conn_id;
+            memcpy(driver->hr_remote_bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
+            ESP_LOGI(TAG, "REMOTE BDA:");
+            esp_log_buffer_hex(TAG, driver->hr_remote_bda, sizeof(esp_bd_addr_t));
+            esp_err_t mtu_ret = esp_ble_gattc_send_mtu_req(gattc_if, param->connect.conn_id);
+            if (mtu_ret)
+            {
+                ESP_LOGE(TAG, "config MTU error, error code = %x", mtu_ret);
+            }
+            break;
+        }
+        case ESP_GATTC_OPEN_EVT:
+            if (param->open.status != ESP_GATT_OK)
+            {
+                ESP_LOGE(TAG, "open failed, status %d", param->open.status);
+                break;
+            }
+            ESP_LOGI(TAG, "open success");
+            break;
+        case ESP_GATTC_DIS_SRVC_CMPL_EVT:
+            if (param->dis_srvc_cmpl.status != ESP_GATT_OK)
+            {
+                ESP_LOGE(TAG, "discover service failed, status %d", param->dis_srvc_cmpl.status);
+                break;
+            }
+            ESP_LOGI(TAG, "discover service complete conn_id %d", param->dis_srvc_cmpl.conn_id);
+            esp_ble_gattc_search_service(gattc_if, param->cfg_mtu.conn_id, &remote_filter_service_uuid);
+            break;
+        case ESP_GATTC_CFG_MTU_EVT:
+            if (param->cfg_mtu.status != ESP_GATT_OK)
+            {
+                ESP_LOGE(TAG, "config mtu failed, error status = %x", param->cfg_mtu.status);
+            }
+            ESP_LOGI(TAG, "ESP_GATTC_CFG_MTU_EVT, Status %d, MTU %d, conn_id %d", param->cfg_mtu.status, param->cfg_mtu.mtu, param->cfg_mtu.conn_id);
+            break;
+        case ESP_GATTC_SEARCH_RES_EVT:
+        {
+            ESP_LOGI(TAG, "SEARCH RES: conn_id = %x is primary service %d", param->search_res.conn_id, param->search_res.is_primary);
+            ESP_LOGI(TAG, "start handle %d end handle %d current handle value %d", param->search_res.start_handle, param->search_res.end_handle, param->search_res.srvc_id.inst_id);
+            if (param->search_res.srvc_id.uuid.len == ESP_UUID_LEN_16 && param->search_res.srvc_id.uuid.uuid.uuid16 == ESP_GATT_UUID_HEART_RATE_SVC)
+            {
+                ESP_LOGI(TAG, "service found");
+                driver->hr_server_found = true;
+                driver->hr_service_start_handle = param->search_res.start_handle;
+                driver->hr_service_end_handle = param->search_res.end_handle;
+                ESP_LOGI(TAG, "UUID16: %x", param->search_res.srvc_id.uuid.uuid.uuid16);
+            }
+            break;
+        }
+        case ESP_GATTC_SEARCH_CMPL_EVT:
+            if (param->search_cmpl.status != ESP_GATT_OK)
+            {
+                ESP_LOGE(TAG, "search service failed, error status = %x", param->search_cmpl.status);
+                break;
+            }
+            if (param->search_cmpl.searched_service_source == ESP_GATT_SERVICE_FROM_REMOTE_DEVICE)
+            {
+                ESP_LOGI(TAG, "Get service information from remote device");
+            }
+            else if (param->search_cmpl.searched_service_source == ESP_GATT_SERVICE_FROM_NVS_FLASH)
+            {
+                ESP_LOGI(TAG, "Get service information from flash");
+            }
+            else
+            {
+                ESP_LOGI(TAG, "unknown service source");
+            }
+            ESP_LOGI(TAG, "ESP_GATTC_SEARCH_CMPL_EVT");
+            if (driver->hr_server_found)
+            {
+                uint16_t count = 0;
+                esp_gatt_status_t status = esp_ble_gattc_get_attr_count(gattc_if,
+                    param->search_cmpl.conn_id,
+                    ESP_GATT_DB_CHARACTERISTIC,
+                    driver->hr_service_start_handle,
+                    driver->hr_service_end_handle,
+                    0,
+                    &count);
+                if (status != ESP_GATT_OK)
+                {
+                    ESP_LOGE(TAG, "esp_ble_gattc_get_attr_count error");
+                }
+
+                if (count > 0)
+                {
+                    driver->hr_char_elem_result = (esp_gattc_char_elem_t*)malloc(sizeof(esp_gattc_char_elem_t) * count);
+                    if (!driver->hr_char_elem_result)
+                    {
+                        ESP_LOGE(TAG, "gattc no mem");
+                    }
+                    else
+                    {
+                        status = esp_ble_gattc_get_char_by_uuid(gattc_if,
+                            param->search_cmpl.conn_id,
+                            driver->hr_service_start_handle,
+                            driver->hr_service_end_handle,
+                            remote_filter_char_uuid,
+                            driver->hr_char_elem_result,
+                            &count);
+                        if (status != ESP_GATT_OK)
+                        {
+                            ESP_LOGE(TAG, "esp_ble_gattc_get_char_by_uuid error");
+                        }
+
+                        /*  Every service have only one char in our 'ESP_GATTS_DEMO' demo, so we used first 'char_elem_result' */
+                        if (count > 0 && (driver->hr_char_elem_result[0].properties & ESP_GATT_CHAR_PROP_BIT_NOTIFY))
+                        {
+                            driver->hr_char_handle = driver->hr_char_elem_result[0].char_handle;
+                            esp_ble_gattc_register_for_notify(gattc_if, driver->hr_remote_bda, driver->hr_char_elem_result[0].char_handle);
+                        }
+                    }
+                    /* free char_elem_result */
+                    free(driver->hr_char_elem_result);
+                    driver->hr_char_elem_result = NULL;
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "no char found");
+                }
+            }
+            break;
+        case ESP_GATTC_REG_FOR_NOTIFY_EVT:
+        {
+            ESP_LOGI(TAG, "ESP_GATTC_REG_FOR_NOTIFY_EVT");
+            if (param->reg_for_notify.status != ESP_GATT_OK)
+            {
+                ESP_LOGE(TAG, "REG FOR NOTIFY failed: error status = %d", param->reg_for_notify.status);
+            }
+            else
+            {
+                uint16_t count = 0;
+                uint16_t notify_en = 1;
+                esp_gatt_status_t ret_status = esp_ble_gattc_get_attr_count(gattc_if,
+                    driver->hr_conn_id,
+                    ESP_GATT_DB_DESCRIPTOR,
+                    driver->hr_service_start_handle,
+                    driver->hr_service_end_handle,
+                    driver->hr_char_handle,
+                    &count);
+                if (ret_status != ESP_GATT_OK)
+                {
+                    ESP_LOGE(TAG, "esp_ble_gattc_get_attr_count error");
+                }
+                if (count > 0)
+                {
+                    driver->hr_descr_elem_result = malloc(sizeof(esp_gattc_descr_elem_t) * count);
+                    if (!driver->hr_descr_elem_result)
+                    {
+                        ESP_LOGE(TAG, "malloc error, gattc no mem");
+                    }
+                    else
+                    {
+                        ret_status = esp_ble_gattc_get_descr_by_char_handle(gattc_if,
+                            driver->hr_conn_id,
+                            param->reg_for_notify.handle,
+                            notify_descr_uuid,
+                            driver->hr_descr_elem_result,
+                            &count);
+                        if (ret_status != ESP_GATT_OK)
+                        {
+                            ESP_LOGE(TAG, "esp_ble_gattc_get_descr_by_char_handle error");
+                        }
+                        /* Every char has only one descriptor in our 'ESP_GATTS_DEMO' demo, so we used first 'descr_elem_result' */
+                        if (count > 0 && driver->hr_descr_elem_result[0].uuid.len == ESP_UUID_LEN_16 && driver->hr_descr_elem_result[0].uuid.uuid.uuid16 == ESP_GATT_UUID_CHAR_CLIENT_CONFIG)
+                        {
+                            ret_status = esp_ble_gattc_write_char_descr(gattc_if,
+                                driver->hr_conn_id,
+                                driver->hr_descr_elem_result[0].handle,
+                                sizeof(notify_en),
+                                (uint8_t*)&notify_en,
+                                ESP_GATT_WRITE_TYPE_RSP,
+                                ESP_GATT_AUTH_REQ_NONE);
+                        }
+
+                        if (ret_status != ESP_GATT_OK)
+                        {
+                            ESP_LOGE(TAG, "esp_ble_gattc_write_char_descr error");
+                        }
+
+                        /* free descr_elem_result */
+                        free(driver->hr_descr_elem_result);
+                        driver->hr_descr_elem_result = NULL;
+                    }
+                }
+                else
+                {
+                    ESP_LOGE(TAG, "decsr not found");
+                }
+
+            }
+            break;
+        }
+        case ESP_GATTC_NOTIFY_EVT:
+            if (param->notify.handle == driver->hr_char_handle)
+            {
+                esp_log_buffer_hex(TAG, param->notify.value, param->notify.value_len);
+                if (param->notify.value_len >= 2)
+                {
+                    uint8_t format = param->notify.value[0] & HEARTRATE_MEASUREMENT_FORMAT_MASK;
+                    uint8_t sensor_contact = param->notify.value[0] & HEARTRATE_MEASUREMENT_SENSOR_CONTACT_MASK;
+                    if (sensor_contact != HEARTRATE_MEASUREMENT_SENSOR_CONTACT_NONE)
+                    {
+                        if (format == HEARTRATE_MEASUREMENT_FORMAT_8BIT)
+                        {
+                            uint8_t heart_rate = param->notify.value[1];
+
+                            hrm_set_rate(driver->hrm_handle, HRM_SOURCE_BLE, heart_rate);
+                        }
+                        else if (format == HEARTRATE_MEASUREMENT_FORMAT_16BIT && param->notify.value_len >= 3)
+                        {
+                            uint16_t heart_rate = ((uint16_t*)(param->notify.value + 1))[0];
+
+                            if (heart_rate < 256)
+                            {
+                                hrm_set_rate(driver->hrm_handle, HRM_SOURCE_BLE, (uint8_t)heart_rate);
+                            }
+                            else
+                            {
+                                // ???
+                                hrm_set_rate(driver->hrm_handle, HRM_SOURCE_BLE, 255);
+                            }
+                        }
+                    }
+                }
+            }
+            break;
+        case ESP_GATTC_WRITE_DESCR_EVT:
+            if (param->write.status != ESP_GATT_OK)
+            {
+                ESP_LOGE(TAG, "write descr failed, error status = %x", param->write.status);
+                break;
+            }
+            ESP_LOGI(TAG, "write descr success ");
+            // uint8_t write_char_data[35];
+            // for (int i = 0; i < sizeof(write_char_data); ++i)
+            // {
+            //     write_char_data[i] = i % 256;
+            // }
+            // esp_ble_gattc_write_char(gattc_if,
+            //     driver->hr_conn_id,
+            //     driver->hr_char_handle,
+            //     sizeof(write_char_data),
+            //     write_char_data,
+            //     ESP_GATT_WRITE_TYPE_RSP,
+            //     ESP_GATT_AUTH_REQ_NONE);
+            break;
+        case ESP_GATTC_SRVC_CHG_EVT:
+        {
+            esp_bd_addr_t bda;
+            memcpy(bda, param->srvc_chg.remote_bda, sizeof(esp_bd_addr_t));
+            ESP_LOGI(TAG, "ESP_GATTC_SRVC_CHG_EVT, bd_addr:");
+            esp_log_buffer_hex(TAG, bda, sizeof(esp_bd_addr_t));
+            break;
+        }
+        case ESP_GATTC_WRITE_CHAR_EVT:
+            if (param->write.status != ESP_GATT_OK)
+            {
+                ESP_LOGE(TAG, "write char failed, error status = %x", param->write.status);
+                break;
+            }
+            ESP_LOGI(TAG, "write char success ");
+            break;
+        case ESP_GATTC_DISCONNECT_EVT:
+            driver->hr_connected = false;
+            driver->hr_server_found = false;
+            ESP_LOGI(TAG, "ESP_GATTC_DISCONNECT_EVT, reason = %d", param->disconnect.reason);
+            esp_ble_gap_start_scanning(30);
+            break;
+        default:
+            break;
+    }
+}
+
+
 esp_err_t ble_init(hrm_handle_t hrm_handle, s4_handle_t s4_handle, ble_handle_t* ble_handle)
 {
     *ble_handle = NULL;
@@ -801,7 +1227,7 @@ esp_err_t ble_init(hrm_handle_t hrm_handle, s4_handle_t s4_handle, ble_handle_t*
     if (initialized)
     {
         return ESP_FAIL;
-    }    
+    }
 
     ble_driver_t* driver = malloc(sizeof(ble_driver_t));
     memset(driver, 0, sizeof(ble_driver_t));
@@ -815,12 +1241,16 @@ esp_err_t ble_init(hrm_handle_t hrm_handle, s4_handle_t s4_handle, ble_handle_t*
     ESP_ERROR_CHECK(esp_bluedroid_init());
     ESP_ERROR_CHECK(esp_bluedroid_enable());
     ESP_ERROR_CHECK(esp_ble_gatts_register_callback(gatts_profile_event_handler));
+    ESP_ERROR_CHECK(esp_ble_gattc_register_callback(gattc_profile_event_handler));
     ESP_ERROR_CHECK(esp_ble_gap_register_callback(gap_event_handler));
-    ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_APP_ID));
     ESP_ERROR_CHECK(esp_ble_gatt_set_local_mtu(500));
 
+    ble_handler_driver = driver;
+
+    ESP_ERROR_CHECK(esp_ble_gatts_app_register(WATERROWER_APP_ID));
+    ESP_ERROR_CHECK(esp_ble_gattc_app_register(WATERROWER_APP_ID));
+
     *ble_handle = driver;
-    gatts_profile_event_handler_driver = driver;
 
     initialized = true;
 

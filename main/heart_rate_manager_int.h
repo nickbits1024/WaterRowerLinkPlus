@@ -1,4 +1,4 @@
-#define HRM_TIMEOUT         (60 * 5)
+#define HRM_TIMEOUT         10
 
 typedef struct
 {

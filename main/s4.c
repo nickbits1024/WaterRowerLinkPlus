@@ -618,7 +618,7 @@ static void s4_heart_beat_task(void* param)
             ets_delay_us(10000);
             gpio_set_level(S4_HEART_BEAT_TX_GPIO_NUM, 0);
 
-            printf("s4 hr %u period %u\n", hr, hr_period);
+            //printf("s4 hr %u period %u\n", hr, hr_period);
 
             vTaskDelay((hr_period - 10) / portTICK_PERIOD_MS);
         }

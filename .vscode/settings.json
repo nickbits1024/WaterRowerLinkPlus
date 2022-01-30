@@ -31,6 +31,10 @@
         "xlocnum": "c",
         "xtr1common": "c",
         "s4.h": "c",
-        "heart_rate_manager.h": "c"
+        "heart_rate_manager.h": "c",
+        "algorithm": "c",
+        "iterator": "c",
+        "xhash": "c",
+        "xtree": "c"
     }
 }

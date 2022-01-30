@@ -18,6 +18,108 @@
 #define ADV_CONFIG_FLAG             (1 << 0)
 #define SCAN_RSP_CONFIG_FLAG        (1 << 1)
 
+
+enum
+{
+    IDX_CSC_SVC,
+    IDX_CSC_MEASUREMENT,
+    IDX_CSC_MEASUREMENT_VAL,
+    IDX_CSC_MEASUREMENT_CFG,
+    IDX_CSC_FEATURE,
+    IDX_CSC_FEATURE_VAL,
+    IDX_SENSOR_LOCATION,
+    IDX_SENSOR_LOCATION_VAL,
+    IDX_CSC_SC_CONTROL_POINT,
+    IDX_CSC_SC_CONTROL_POINT_VAL,
+    CSC_IDX_NB
+};
+
+enum
+{
+    IDX_FTMS_SVC,
+    IDX_FTMS_FEATURE,
+    IDX_FTMS_FEATURE_VAL,
+    IDX_FTMS_ROWER_DATA,
+    IDX_FTMS_ROWER_DATA_VAL,
+    IDX_FTMS_ROWER_DATA_CFG,
+    IDX_FTMS_INDOOR_BIKE_DATA,
+    IDX_FTMS_INDOOR_BIKE_DATA_VAL,
+    IDX_FTMS_INDOOR_BIKE_DATA_CFG,
+    IDX_FTMS_CONTROL_POINT,
+    IDX_FTMS_CONTROL_POINT_VAL,
+    FTMS_IDX_NB
+};
+
+enum
+{
+    IDX_HR_SVC,
+    IDX_HR_MEASUREMENT,
+    IDX_HR_MEASUREMENT_VAL,
+    IDX_HR_MEASUREMENT_CFG,
+    IDX_BODY_SENSOR_LOCATION,
+    IDX_BODY_SENSOR_LOCATION_VAL,
+    IDX_HR_CONTROL_POINT,
+    IDX_HR_CONTROL_POINT_VAL,
+    HR_IDX_NB
+};
+
+#define FTMS_FEATURE_AVERAGE_SPEED_SUPPORTED                    (1 << 0)
+#define FTMS_FEATURE_CADENCE_SUPPORTED                          (1 << 1)
+#define FTMS_FEATURE_TOTAL_DISTANCE_SUPPORTED                   (1 << 2)
+#define FTMS_FEATURE_INCLINATION_SUPPORTED                      (1 << 3)
+#define FTMS_FEATURE_ELEVATION_GAIN_SUPPORTED                   (1 << 4)
+#define FTMS_FEATURE_PACE_SUPPORTED                             (1 << 5)
+#define FTMS_FEATURE_STEP_COUNT_SUPPORTED                       (1 << 6)
+#define FTMS_FEATURE_RESISTANCE_LEVEL_SUPPORTED                 (1 << 7)
+
+#define FTMS_FEATURE_STRIDE_COUNT_SUPPORTED                     (1 << 8)
+#define FTMS_FEATURE_EXPENDED_ENERGY_SUPPORTED                  (1 << 9)
+#define FTMS_FEATURE_HEART_RATE_MEASUREMENT_SUPPORTED           (1 << 10)
+#define FTMS_FEATURE_METABOLIC_EQUIVALENT_SUPPORTED             (1 << 11)
+#define FTMS_FEATURE_ELAPSED_TIME_SUPPORTED                     (1 << 12)
+#define FTMS_FEATURE_REMAINING_TIME_SUPPORTED                   (1 << 13)
+#define FTMS_FEATURE_POWER_MEASUREMENT_SUPPORTED                (1 << 14)
+#define FTMS_FEATURE_FORCE_ON_BELT_AND_POWER_OUTPUT_SUPPORTED   (1 << 15)
+#define FTMS_FEATURE_USER_DATA_RETENTION_SUPPORTED              (1 << 16)
+
+#define FTMS_ROWER_AVERAGE_STROKE               (1 << 1)
+#define FTMS_ROWER_TOTAL_DISTANCE               (1 << 2)
+#define FTMS_ROWER_INSTANTANEOUS_PACE           (1 << 3)
+#define FTMS_ROWER_AVERAGE_PACE                 (1 << 4)
+#define FTMS_ROWER_INSTANTANEOUS_POWER          (1 << 5)
+#define FTMS_ROWER_AVERAGE_POWER                (1 << 6)
+#define FTMS_ROWER_RESISTANCE_LEVEL             (1 << 7)
+
+#define FTMS_ROWER_EXPENDED_ENERGY              (1 << 8)
+#define FTMS_ROWER_HEART_RATE                   (1 << 9)
+#define FTMS_ROWER_METABOLIC_EQUIVALENT         (1 << 10)
+#define FTMS_ROWER_ELAPSED_TIME                 (1 << 11)
+#define FTMS_ROWER_REMAINING_TIME               (1 << 12)
+
+#define FTMS_INDOOR_BIKE_AVERAGE_SPEED          (1 << 1)
+#define FTMS_INDOOR_BIKE_INSTANTANEOUS_CADENCE  (1 << 2)
+#define FTMS_INDOOR_BIKE_AVERAGE_CADENCE        (1 << 3)
+#define FTMS_INDOOR_BIKE_TOTAL_DISTANCE         (1 << 4)
+#define FTMS_INDOOR_BIKE_RESISTANCE_LEVEL       (1 << 5)
+#define FTMS_INDOOR_BIKE_INSTANTANEOUS_POWER    (1 << 6)
+#define FTMS_INDOOR_BIKE_AVERAGE_POWER          (1 << 7)
+
+#define FTMS_INDOOR_BIKE_EXPENDED_ENERGY        (1 << 8)
+#define FTMS_INDOOR_BIKE_HEART_RATE             (1 << 9)
+#define FTMS_INDOOR_BIKE_METABOLIC_EQUIVALENT   (1 << 10)
+#define FTMS_INDOOR_BIKE_ELAPSED_TIME           (1 << 11)
+#define FTMS_INDOOR_BIKE_REMAINING_TIME         (1 << 12)
+
+#define HEARTRATE_MEASUREMENT_FORMAT_MASK       1
+#define HEARTRATE_MEASUREMENT_FORMAT_8BIT       0
+#define HEARTRATE_MEASUREMENT_FORMAT_16BIT      1
+
+#define HEARTRATE_MEASUREMENT_SENSOR_CONTACT_MASK       6
+#define HEARTRATE_MEASUREMENT_SENSOR_CONTACT_NONE       4
+#define HEARTRATE_MEASUREMENT_SENSOR_CONTACT_DETECTED   6
+
+
+
 static uint8_t adv_config_done = 0;
 
 uint16_t csc_handle_table[CSC_IDX_NB];
@@ -26,41 +128,48 @@ uint16_t hr_handle_table[HR_IDX_NB];
 
 //waterrower_handle_t waterrower_handle;
 
+// typedef struct
+// {
+//     uint8_t* prepare_buf;
+//     int                     prepare_len;
+// } prepare_type_env_t;
+
+
+// struct gatts_profile_inst
+// {
+//     esp_gatts_cb_t gatts_cb;
+//     uint16_t gatts_if;
+//     uint16_t app_id;
+//     uint16_t conn_id;
+//     uint16_t service_handle;
+//     esp_gatt_srvc_id_t service_id;
+//     uint16_t char_handle;
+//     esp_bt_uuid_t char_uuid;
+//     esp_gatt_perm_t perm;
+//     esp_gatt_char_prop_t property;
+//     uint16_t descr_handle;
+//     esp_bt_uuid_t descr_uuid;
+// };
+
+static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t* param);
+
 typedef struct
 {
-    uint8_t* prepare_buf;
-    int                     prepare_len;
-} prepare_type_env_t;
+    hrm_handle_t hrm_handle;
+    s4_handle_t s4_handle;
 
-
-struct gatts_profile_inst
-{
-    esp_gatts_cb_t gatts_cb;
-    uint16_t gatts_if;
-    uint16_t app_id;
-    uint16_t conn_id;
-    uint16_t service_handle;
-    esp_gatt_srvc_id_t service_id;
-    uint16_t char_handle;
-    esp_bt_uuid_t char_uuid;
-    esp_gatt_perm_t perm;
-    esp_gatt_char_prop_t property;
-    uint16_t descr_handle;
-    esp_bt_uuid_t descr_uuid;
-};
-
-static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
-    esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t* param);
-
-#if 0
-/* One gatt-based profile one app_id and one gatts_if, this array will store the gatts_if returned by ESP_GATTS_REG_EVT */
-static struct gatts_profile_inst csc_profile_tab[PROFILE_NUM] = {
-    [PROFILE_APP_IDX] = {
-        .gatts_cb = gatts_profile_event_handler,
-        .gatts_if = ESP_GATT_IF_NONE,       /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
-    },
-};
-#endif
+    uint16_t hr_gattc_if;
+    uint16_t hr_char_handle;
+    uint16_t hr_conn_id;
+    esp_bd_addr_t hr_remote_bda;
+    uint16_t hr_service_start_handle;
+    uint16_t hr_service_end_handle;
+    bool hr_server_found;
+    bool hr_connected;
+    esp_gattc_char_elem_t* hr_char_elem_result;
+    esp_gattc_descr_elem_t* hr_descr_elem_result;
+}
+ble_driver_t;
 
 typedef struct
 {

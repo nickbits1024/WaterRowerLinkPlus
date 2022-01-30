@@ -43,27 +43,27 @@ esp_err_t hrm_get_rate(hrm_handle_t hrm_handle, uint8_t* heart_rate)
 {
     heart_rate_driver_t* driver = (heart_rate_driver_t*)hrm_handle;
 
+    int64_t now = esp_timer_get_time();
     portENTER_CRITICAL(&driver->mux);
-    uint8_t hr = driver->sources[0].heart_rate;
-    int64_t ts = driver->sources[0].heart_rate_ts;
-    int source = 0;
+    uint8_t hr;
+    int source = -1;
 
-    for (int i = 1; i < HRM_SOURCE_MAX; i++)
+    for (int i = 0; i < HRM_SOURCE_MAX; i++)
     {
-        if (driver->sources[i].heart_rate_ts < ts && driver->sources[i].heart_rate > 0)
+        if (now - driver->sources[i].heart_rate_ts < HRM_TIMEOUT * 1000000llu && driver->sources[i].heart_rate > 0)
         {
             hr = driver->sources[i].heart_rate;
-            ts = driver->sources[i].heart_rate_ts;
             source = i;
+            break;
         }
     }    
 
     portEXIT_CRITICAL(&driver->mux);
 
-    if (esp_timer_get_time() - ts < HRM_TIMEOUT * 1000000llu)
+    if (source != -1)
     {
         *heart_rate = hr;
-        printf("hr %u source %u\n", hr, source);
+        printf("got hr %u from source %u\n", hr, source);
     }
     else
     {
