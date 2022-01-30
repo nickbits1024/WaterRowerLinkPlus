@@ -8,6 +8,8 @@
 #include "heart_rate_manager.h"
 #include "heart_rate_manager_int.h"
 
+#define TAG "hrm"
+
 esp_err_t hrm_init(hrm_handle_t* hrm_handle)
 {
     heart_rate_driver_t* driver = malloc(sizeof(heart_rate_driver_t));
@@ -29,7 +31,14 @@ esp_err_t hrm_set_rate(hrm_handle_t hrm_handle, int source, uint8_t heart_rate)
         return ESP_FAIL;
     }
 
-    ets_printf("set source %u hr %u\n", source, heart_rate);
+    // if (source == HRM_SOURCE_S4)
+    // {
+    //     ESP_DRAM_LOGI(TAG, "set source %u hr %u", source, heart_rate);
+    // }
+    // else
+    // {
+    //     ESP_LOGI(TAG, "set source %u hr %u", source, heart_rate);
+    // }
 
     portENTER_CRITICAL(&driver->mux);
     driver->sources[source].heart_rate = heart_rate;
@@ -63,7 +72,7 @@ esp_err_t hrm_get_rate(hrm_handle_t hrm_handle, uint8_t* heart_rate)
     if (source != -1)
     {
         *heart_rate = hr;
-        printf("got hr %u from source %u\n", hr, source);
+        //ESP_LOGI(TAG, "got hr %u from source %u", hr, source);
     }
     else
     {

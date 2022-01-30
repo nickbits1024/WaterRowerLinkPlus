@@ -1171,18 +1171,6 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
                 break;
             }
             ESP_LOGI(TAG, "write descr success ");
-            // uint8_t write_char_data[35];
-            // for (int i = 0; i < sizeof(write_char_data); ++i)
-            // {
-            //     write_char_data[i] = i % 256;
-            // }
-            // esp_ble_gattc_write_char(gattc_if,
-            //     driver->hr_conn_id,
-            //     driver->hr_char_handle,
-            //     sizeof(write_char_data),
-            //     write_char_data,
-            //     ESP_GATT_WRITE_TYPE_RSP,
-            //     ESP_GATT_AUTH_REQ_NONE);
             break;
         case ESP_GATTC_SRVC_CHG_EVT:
         {
@@ -1203,8 +1191,8 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
         case ESP_GATTC_DISCONNECT_EVT:
             ESP_LOGI(TAG, "ESP_GATTC_DISCONNECT_EVT, conn_id = %x, reason = 0x%x", param->disconnect.conn_id, param->disconnect.reason);
             esp_log_buffer_hex(TAG, param->disconnect.remote_bda, sizeof(esp_bd_addr_t));
-            ESP_LOGI(TAG, "hr_connected: %u, hr_conn_id: %x", driver->hr_connected, driver->hr_conn_id);
-            esp_log_buffer_hex(TAG, driver->hr_remote_bda, sizeof(esp_bd_addr_t));
+            //ESP_LOGI(TAG, "hr_connected: %u, hr_conn_id: %x", driver->hr_connected, driver->hr_conn_id);
+            //esp_log_buffer_hex(TAG, driver->hr_remote_bda, sizeof(esp_bd_addr_t));
             if (driver->hr_connected && 
                 driver->hr_conn_id == param->disconnect.conn_id && 
                 memcmp(driver->hr_remote_bda, param->disconnect.remote_bda, sizeof(esp_bd_addr_t)) == 0)
