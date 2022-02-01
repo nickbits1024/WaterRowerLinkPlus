@@ -25,6 +25,7 @@ typedef struct
 
 typedef void* s4_handle_t;
 
+esp_err_t s4_preinit();
 esp_err_t s4_init(hrm_handle_t hrm_handle, s4_handle_t* waterrower_handle);
 esp_err_t s4_get_values(s4_handle_t waterrower_handle, s4_values_t* values);
 

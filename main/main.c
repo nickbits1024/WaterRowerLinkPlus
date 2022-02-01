@@ -53,6 +53,7 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
 
+    ESP_ERROR_CHECK(s4_preinit());
     ESP_ERROR_CHECK(hrm_init(&hrm_handle));
     ESP_ERROR_CHECK(usb_init());
     ESP_ERROR_CHECK(s4_init(hrm_handle, &s4_handle));

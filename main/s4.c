@@ -306,22 +306,8 @@ static esp_err_t s4_shutdown(s4_driver_t* driver)
     return ESP_OK;
 }
 
-esp_err_t s4_init(hrm_handle_t hrm_handle, s4_handle_t* s4_handle)
+esp_err_t s4_preinit()
 {
-    *s4_handle = NULL;
-
-    s4_driver_t* driver = malloc(sizeof(s4_driver_t));
-    memset(driver, 0, sizeof(s4_driver_t));
-
-    driver->hrm_handle = hrm_handle;
-
-    driver->device_sem = xSemaphoreCreateBinary();
-    driver->out_sem = xSemaphoreCreateBinary();
-    driver->out_resp_sem = xSemaphoreCreateBinary();
-    driver->cmd_sem = xSemaphoreCreateBinary();
-    xSemaphoreGive(driver->cmd_sem);
-    portMUX_INITIALIZE(&driver->values_mux);
-
     gpio_config_t io_conf;
 
     io_conf.pin_bit_mask = S4_USB_POWER_GPIO_SEL | S4_HEART_BEAT_TX_GPIO_SEL;
@@ -343,6 +329,25 @@ esp_err_t s4_init(hrm_handle_t hrm_handle, s4_handle_t* s4_handle)
 
     gpio_config(&io_conf);
     //vTaskDelay(50 / portTICK_PERIOD_MS);
+
+    return ESP_OK;
+}
+
+esp_err_t s4_init(hrm_handle_t hrm_handle, s4_handle_t* s4_handle)
+{
+    *s4_handle = NULL;
+
+    s4_driver_t* driver = malloc(sizeof(s4_driver_t));
+    memset(driver, 0, sizeof(s4_driver_t));
+
+    driver->hrm_handle = hrm_handle;
+
+    driver->device_sem = xSemaphoreCreateBinary();
+    driver->out_sem = xSemaphoreCreateBinary();
+    driver->out_resp_sem = xSemaphoreCreateBinary();
+    driver->cmd_sem = xSemaphoreCreateBinary();
+    xSemaphoreGive(driver->cmd_sem);
+    portMUX_INITIALIZE(&driver->values_mux);
 
     usb_host_client_config_t client_config = {
         .is_synchronous = false,

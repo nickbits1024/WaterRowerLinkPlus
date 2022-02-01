@@ -643,7 +643,7 @@ void notify_ftms_indoor_bike_data(void* p)
         if (s4_get_values(ctx->driver->s4_handle, &values) == ESP_OK)
         {
             uint16_t speed = (uint16_t)(values.current_speed * 60 * 60 / 1000);
-            ets_printf("cm/s =%u km/h=%.1f\n", values.current_speed, speed / 100.0f);
+            ESP_LOGI(TAG, "speed %u cm/s, %0.1f km/h", values.current_speed, speed / 100.0f);
             uint8_t cadence = values.stroke_rate_x2;
             uint32_t distance = values.distance;
             uint16_t power = values.power;
