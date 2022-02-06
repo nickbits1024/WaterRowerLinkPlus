@@ -54,15 +54,30 @@ esp_err_t state_manager_set_component_state(state_manager_handle_t* sm_handle, u
     {
         uint8_t red = 0, green = 0, blue = 0;
 
-        red = (new_state & STATE_MANAGER_COMPONENT_HR) ? 255 : 0;
-        green = (new_state & STATE_MANAGER_COMPONENT_S4) ? 255 : 0;
-        blue = (new_state & STATE_MANAGER_COMPONENT_ANT) ? 255 : 0;
+        bool hr = (new_state & STATE_MANAGER_COMPONENT_HR) != 0;
+        bool s4 = (new_state & STATE_MANAGER_COMPONENT_S4) != 0;
+        bool ant = (new_state & STATE_MANAGER_COMPONENT_ANT) != 0;
+
+        if (hr && s4 && ant)
+        {
+            red = 255;
+            green = 255;
+            blue = 255;
+        }
+        else
+        {
+            red = hr ? 128 : 0;
+            green = s4 ? 128 : 0;
+            blue = ant ? 128 : 0;
+        }
 
         if (old_state != new_state)
-        ESP_LOGI(TAG, "led r: %u g: %u b: %u", red, green, blue);
+        {
+            ESP_LOGI(TAG, "led r: %u g: %u b: %u", red, green, blue);
 
-        ESP_ERROR_CHECK(driver->led_strip->set_pixel(driver->led_strip, 0, red, green, blue));
-        ESP_ERROR_CHECK(driver->led_strip->refresh(driver->led_strip, 100));
+            ESP_ERROR_CHECK(driver->led_strip->set_pixel(driver->led_strip, 0, red, green, blue));
+            ESP_ERROR_CHECK(driver->led_strip->refresh(driver->led_strip, 100));
+        }
     }
 
     return ESP_OK;

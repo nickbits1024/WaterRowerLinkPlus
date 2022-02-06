@@ -11,6 +11,8 @@
 
 #define TAG "hrm"
 
+static void hrm_heart_beat_task(void* param);
+
 esp_err_t hrm_init(state_manager_handle_t sm_handle, hrm_handle_t* hrm_handle)
 {
     heart_rate_driver_t* driver = malloc(sizeof(heart_rate_driver_t));
@@ -21,6 +23,8 @@ esp_err_t hrm_init(state_manager_handle_t sm_handle, hrm_handle_t* hrm_handle)
     // driver->sources[0].source_id = HRM_SOURCE_ANT;
     // driver->sources[1].source_id = HRM_SOURCE_BLE;
     // driver->sources[2].source_id = HRM_SOURCE_S4;
+
+    xTaskCreate(hrm_heart_beat_task, "hrm_heart_beat_task", 4096, driver, 23, NULL);
 
     *hrm_handle = driver;
 
@@ -43,7 +47,7 @@ esp_err_t hrm_set_rate(hrm_handle_t hrm_handle, uint8_t source, uint8_t heart_ra
     driver->sources[source].heart_rate_ts = esp_timer_get_time();
     portEXIT_CRITICAL(&driver->mux);
 
-    ESP_DRAM_LOGI(TAG, "set source %u hr %u", source, heart_rate);
+    //ESP_DRAM_LOGI(TAG, "set source %u hr %u", source, heart_rate);
 
     return ESP_OK;
 }
@@ -72,16 +76,39 @@ esp_err_t hrm_get_rate(hrm_handle_t hrm_handle, uint8_t* heart_rate)
     if (source != -1)
     {
         *heart_rate = hr;
-        ESP_LOGI(TAG, "got hr %u from source %u", hr, source);
-
-        state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_HR, hr > 0);
+        //ESP_LOGI(TAG, "got hr %u from source %u", hr, source);        
     }
     else
     {
         *heart_rate = 0;
-
-        state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_HR, false);
+       
     }
 
     return ESP_OK;
+}
+
+static void hrm_heart_beat_task(void* param)
+{
+    heart_rate_driver_t* driver = (heart_rate_driver_t*)param;
+
+    for (;;) 
+    {
+        uint8_t hr;
+        if (hrm_get_rate(driver, &hr) == ESP_OK && hr > 0)
+        {
+            uint16_t hr_period = 60000 / hr;
+
+            vTaskDelay(hr_period / 2 / portTICK_PERIOD_MS);
+            state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_HR, true);
+            
+            vTaskDelay(hr_period / 2 / portTICK_PERIOD_MS);
+            state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_HR, false);
+        }
+        else
+        {
+            state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_HR, false);
+
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+        }
+    }
 }

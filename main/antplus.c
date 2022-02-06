@@ -442,7 +442,7 @@ void antplus_trainer_task(void* param)
                 page->data.cadence = values.stroke_rate_x2 / 2;
                 page->data.power = values.power;
                 page->data.flags = ANTPLUS_CAPS_STROKES;
-                ESP_LOGI(TAG, "ANT+ power %u", values.power);
+                //ESP_LOGI(TAG, "ANT+ power %u", values.power);
             }
             else
             {

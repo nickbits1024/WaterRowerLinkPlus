@@ -125,7 +125,9 @@ static void s4_in_callback(usb_transfer_t* transfer)
         if (transfer->status != USB_TRANSFER_STATUS_CANCELED)
         {
             //abort();
+            ESP_ERROR_CHECK(usb_host_transfer_submit(driver->in_transfer));
         }
+        
         return;
     }
 
@@ -504,7 +506,6 @@ static void s4_set_value(s4_driver_t* driver, uint16_t address, uint32_t value)
             case S4_STROKE_AVERAGE:
                 driver->values.stroke_average = value;
                 s4_update_stroke_rate(driver);
-                ets_printf("stroke avg %u\n", value);
                 break;
                 // case S4_POWER:
                 //     if (driver->values.power != value)
@@ -521,7 +522,7 @@ static void s4_set_value(s4_driver_t* driver, uint16_t address, uint32_t value)
                 value = ((value & 0xff) << 8) | (value >> 8);
                 // concept 2 calc
                 driver->values.power = value != 0 && driver->values.stroke_rate_x2 > 0 ? (uint16_t)(2.80 / pow(value / 500.0, 3)) : 0;
-                ets_printf("500 pace: %u (%u:%02u) power: %uW sr_x2: %u\n", value, value / 60 , value % 60, driver->values.power, driver->values.stroke_rate_x2);
+                //ets_printf("500 pace: %u (%u:%02u) power: %uW sr_x2: %u\n", value, value / 60 , value % 60, driver->values.power, driver->values.stroke_rate_x2);
                 break;
             case S4_CALORIES:
                 value = (value + 500) / 1000;

@@ -3,8 +3,8 @@
 #ifndef HEART_RATE_MANAGER_H
 #define HEART_RATE_MANAGER_H
 
-#define HRM_SOURCE_ANT      1
-#define HRM_SOURCE_BLE      2
+#define HRM_SOURCE_ANT      0
+#define HRM_SOURCE_BLE      1
 //#define HRM_SOURCE_S4       4
 //#define HRM_SOURCE_ANY      0xff
 #define HRM_NUM_SOURCES     2
