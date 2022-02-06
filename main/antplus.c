@@ -8,6 +8,7 @@
 #include "driver/uart.h"
 #include "antplus.h"
 #include "antplus_int.h"
+#include "state_manager.h"
 #include "heart_rate_manager.h"
 #include "s4.h"
 
@@ -61,6 +62,7 @@ void antplus_decode_channel_broadcast_message(antplus_driver_t* driver, antplus_
         if (msg->size == ANTPLUS_MESSAGE_SIZE(antplus_broadcast_message_t))
         {
             antplus_heartrate_broadcast_t* hr_msg = (antplus_heartrate_broadcast_t*)msg;
+            portENTER_CRITICAL(&driver->mux);
             switch (hr_msg->data.page_num)
             {
             case 0:
@@ -68,9 +70,14 @@ void antplus_decode_channel_broadcast_message(antplus_driver_t* driver, antplus_
             case 2:
             case 3:
             case 4:
-                hrm_set_rate(driver->hrm_handle, HRM_SOURCE_ANT, hr_msg->data.common.hr);
+                if (driver->heart_beat_ts != hr_msg->data.common.heart_beat_ts)
+                {
+                    hrm_set_rate(driver->hrm_handle, HRM_SOURCE_ANT, hr_msg->data.common.hr);
+                    driver->heart_beat_ts = hr_msg->data.common.heart_beat_ts;
+                }
                 break;
             }
+            portEXIT_CRITICAL(&driver->mux);
         }
     }
 }
@@ -323,12 +330,14 @@ esp_err_t antplus_open_channel(antplus_driver_t* driver, uint8_t channel)
     return antplus_send_message(driver, (antplus_message_t*)&msg);
 }
 
-esp_err_t antplus_init(hrm_handle_t* hrm_handle, s4_handle_t s4_handle, antplus_handle_t* antplus_handle)
+esp_err_t antplus_init(state_manager_handle_t sm_handle, hrm_handle_t* hrm_handle, s4_handle_t s4_handle, antplus_handle_t* antplus_handle)
 {
     antplus_driver_t* driver = malloc(sizeof(antplus_driver_t));
     memset(driver, 0, sizeof(antplus_driver_t));
 
     driver->eg_handle = xEventGroupCreate();
+    portMUX_INITIALIZE(&driver->mux);
+    driver->sm_handle = sm_handle;
     driver->hrm_handle = hrm_handle;
     driver->s4_handle = s4_handle;
     driver->uart_num = ANTPLUS_UART_NUM;
@@ -399,6 +408,8 @@ void antplus_trainer_task(void* param)
             uint8_t heart_rate;
             hrm_get_rate(driver->hrm_handle, &heart_rate);
 
+            state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_ANT, values.stroke_rate_x2 > 0);
+
             antplus_broadcast_message_t msg = ANTPLUS_MESSAGE(antplus_broadcast_message_t, ANTPLUS_BROADCAST, ANTPLUS_INPUT);
             msg.data.channel = ANTPLUS_CHANNEL_FE;
 
@@ -431,6 +442,7 @@ void antplus_trainer_task(void* param)
                 page->data.cadence = values.stroke_rate_x2 / 2;
                 page->data.power = values.power;
                 page->data.flags = ANTPLUS_CAPS_STROKES;
+                ESP_LOGI(TAG, "ANT+ power %u", values.power);
             }
             else
             {
@@ -445,6 +457,10 @@ void antplus_trainer_task(void* param)
             }
 
             antplus_send_message(driver, (antplus_message_t*)&msg);
+        }
+        else
+        {
+            state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_ANT, false);
         }
 
         vTaskDelay(250 / portTICK_PERIOD_MS);

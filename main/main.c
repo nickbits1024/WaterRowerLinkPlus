@@ -24,11 +24,12 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
-
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
+#include "driver/gpio.h"
+#include "state_manager.h"
 #include "heart_rate_manager.h"
 #include "antplus.h"
 #include "usb.h"
@@ -45,6 +46,7 @@ void app_main(void)
     s4_handle_t s4_handle;
     hrm_handle_t hrm_handle;
     ble_handle_t ble_handle;
+    state_manager_handle_t sm_handle;
 
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -54,9 +56,11 @@ void app_main(void)
     }
 
     ESP_ERROR_CHECK(s4_preinit());
-    ESP_ERROR_CHECK(hrm_init(&hrm_handle));
+    ESP_ERROR_CHECK(state_manager_init(&sm_handle));
+    ESP_ERROR_CHECK(hrm_init(sm_handle, &hrm_handle));
     ESP_ERROR_CHECK(usb_init());
-    ESP_ERROR_CHECK(s4_init(hrm_handle, &s4_handle));
+    ESP_ERROR_CHECK(s4_init(sm_handle, hrm_handle, &s4_handle));
     ESP_ERROR_CHECK(ble_init(hrm_handle, s4_handle, &ble_handle));
-    ESP_ERROR_CHECK(antplus_init(hrm_handle, s4_handle, &antplus_handle));
+    ESP_ERROR_CHECK(antplus_init(sm_handle, hrm_handle, s4_handle, &antplus_handle));
+
 }

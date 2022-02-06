@@ -9,7 +9,8 @@ hrm_source_t;
 
 typedef struct
 {
-    hrm_source_t sources[HRM_SOURCE_MAX];
+    hrm_source_t sources[HRM_NUM_SOURCES];
+    state_manager_handle_t sm_handle;
     portMUX_TYPE mux;
 }
 heart_rate_driver_t;

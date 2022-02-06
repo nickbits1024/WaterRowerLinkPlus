@@ -354,7 +354,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
                 ESP_LOGE(TAG, "scan start failed, error status = %x", param->scan_start_cmpl.status);
                 break;
             }
-            ESP_LOGI(TAG, "scan start success");
+            //ESP_LOGI(TAG, "scan start success");
 
             break;
         case ESP_GAP_BLE_SCAN_RESULT_EVT:

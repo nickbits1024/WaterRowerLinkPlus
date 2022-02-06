@@ -6,7 +6,9 @@
 #include "esp_log.h"
 #include "usb/usb_host.h"
 #include "driver/gpio.h"
+#include "led_strip.h"
 #include "heart_rate_manager.h"
+#include "state_manager.h"
 #include "s4.h"
 #include "s4_int.h"
 
@@ -187,6 +189,7 @@ static void s4_session_task(void* arg)
         ESP_LOGI(TAG, "Power button pressed");
         gpio_set_level(S4_USB_POWER_GPIO_NUM, 1);
         driver->power_on = true;
+        state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_S4, true);
 
         xSemaphoreTake(driver->device_sem, portMAX_DELAY);
 
@@ -245,6 +248,7 @@ static void s4_session_task(void* arg)
         ESP_ERROR_CHECK(s4_shutdown(driver));
         gpio_set_level(S4_USB_POWER_GPIO_NUM, 0);
         driver->power_on = false;
+        state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_S4, false);
 
         driver->dev_hdl = NULL;
     }
@@ -275,6 +279,8 @@ static esp_err_t s4_setup(s4_driver_t* driver)
     xTaskCreate(s4_out_transfer_task, "wr_out_transfer_task", 4096, driver, 23, &driver->out_transfer_task_handle);
 
     s4_command(driver, S4_COMMAND_USB, S4_COMMAND_USB_RESPONSE);
+
+
 
     //xTaskCreate(s4_poll_task, "s4_poll_task", 4096, driver, 23, &driver->poll_task_handle);
 
@@ -333,13 +339,14 @@ esp_err_t s4_preinit()
     return ESP_OK;
 }
 
-esp_err_t s4_init(hrm_handle_t hrm_handle, s4_handle_t* s4_handle)
+esp_err_t s4_init(state_manager_handle_t sm_handle, hrm_handle_t hrm_handle, s4_handle_t* s4_handle)
 {
     *s4_handle = NULL;
 
     s4_driver_t* driver = malloc(sizeof(s4_driver_t));
     memset(driver, 0, sizeof(s4_driver_t));
 
+    driver->sm_handle = sm_handle;
     driver->hrm_handle = hrm_handle;
 
     driver->device_sem = xSemaphoreCreateBinary();
@@ -441,8 +448,8 @@ static void s4_update_stroke_rate(s4_driver_t* driver)
         if (stalled_time >= stalled_threshold)
         {
             uint32_t n = (stalled_time - stalled_threshold) / 1000 + 1;
-            uint8_t stroke_rate_adjustment = n * log2(n);
-            //ets_printf("Stalled for %llums n %u adj -%u\r\n", stalled_time, n, stroke_rate_adjustment);
+            double stroke_rate_adjustment = n * log2(n);
+            //ets_printf("Stalled for %llums n %u adj -%d\r\n", stalled_time, n, (int)stroke_rate_adjustment);
             if (stroke_rate_x2 >= stroke_rate_adjustment)
             {
                 stroke_rate_x2 -= stroke_rate_adjustment;
@@ -476,7 +483,7 @@ static void s4_set_value(s4_driver_t* driver, uint16_t address, uint32_t value)
     // printf("\n");
     // abort();
 
-    var = bsearch(&key, memory_map, S4_MEMORY_MAP_SIZE, sizeof(s4_variable_t), s4_variable_compare);
+    var = bsearch(&key, memory_map, S4_MEMORY_MAP_SIZE, sizeof(s4_variable_t), s4_variable_compare);    
 
     if (var != NULL)
     {
@@ -497,6 +504,7 @@ static void s4_set_value(s4_driver_t* driver, uint16_t address, uint32_t value)
             case S4_STROKE_AVERAGE:
                 driver->values.stroke_average = value;
                 s4_update_stroke_rate(driver);
+                ets_printf("stroke avg %u\n", value);
                 break;
                 // case S4_POWER:
                 //     if (driver->values.power != value)
@@ -512,8 +520,8 @@ static void s4_set_value(s4_driver_t* driver, uint16_t address, uint32_t value)
                 // flip bytes.  500pace byte order reversed?!
                 value = ((value & 0xff) << 8) | (value >> 8);
                 // concept 2 calc
-                driver->values.power = value != 0 ? (uint16_t)(2.80 / pow(value / 500.0, 3)) : 0;
-                //fprintf("500 pace: %u (%u:%02u) power: %uW\n", value, value / 60 , value % 60, driver->values.power);
+                driver->values.power = value != 0 && driver->values.stroke_rate_x2 > 0 ? (uint16_t)(2.80 / pow(value / 500.0, 3)) : 0;
+                ets_printf("500 pace: %u (%u:%02u) power: %uW sr_x2: %u\n", value, value / 60 , value % 60, driver->values.power, driver->values.stroke_rate_x2);
                 break;
             case S4_CALORIES:
                 value = (value + 500) / 1000;
@@ -536,7 +544,7 @@ static void s4_set_value(s4_driver_t* driver, uint16_t address, uint32_t value)
                 break;
             case S4_HEART_RATE:
                 driver->values.heart_rate = value;
-                hrm_set_rate(driver->hrm_handle, HRM_SOURCE_S4, value);
+                //hrm_set_rate(driver->hrm_handle, HRM_SOURCE_S4, value);
                 break;
         }
 

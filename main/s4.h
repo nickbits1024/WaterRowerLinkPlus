@@ -1,7 +1,8 @@
+#include "state_manager.h"
+#include "heart_rate_manager.h"
+
 #ifndef S4_H
 #define S4_H
-
-#include "heart_rate_manager.h"
 
 typedef struct
 {
@@ -26,7 +27,7 @@ typedef struct
 typedef void* s4_handle_t;
 
 esp_err_t s4_preinit();
-esp_err_t s4_init(hrm_handle_t hrm_handle, s4_handle_t* waterrower_handle);
+esp_err_t s4_init(state_manager_handle_t sm_handle, hrm_handle_t hrm_handle, s4_handle_t* waterrower_handle);
 esp_err_t s4_get_values(s4_handle_t waterrower_handle, s4_values_t* values);
 
 #endif

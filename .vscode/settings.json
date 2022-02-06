@@ -36,6 +36,17 @@
         "iterator": "c",
         "xhash": "c",
         "xtree": "c",
-        "event_groups.h": "c"
+        "event_groups.h": "c",
+        "led_strip.h": "c",
+        "atomic": "c",
+        "deque": "c",
+        "forward_list": "c",
+        "ios": "c",
+        "list": "c",
+        "strstream": "c",
+        "vector": "c",
+        "xiosbase": "c",
+        "state_manager.h": "c",
+        "cmath": "c"
     }
 }
