@@ -559,7 +559,7 @@ void notify_hr_measurement(void* p)
         hr_measurement_value[0] = HEARTRATE_MEASUREMENT_FORMAT_8BIT | HEARTRATE_MEASUREMENT_SENSOR_CONTACT_DETECTED;
         hr_measurement_value[1] = heart_rate;
 
-        ESP_LOGI(TAG, "ble hr %d", heart_rate);
+        ESP_LOGI(TAG, "notify hr %d", heart_rate);
 
         esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->hr_handle_table[IDX_HR_MEASUREMENT_VAL], sizeof(hr_measurement_value), hr_measurement_value, false);
         if (ret != ESP_OK)
@@ -618,7 +618,7 @@ void notify_ftms_rower_data(void* p)
             rower_data_value_value[18] = elapsed & 0xff;
             rower_data_value_value[19] = (elapsed >> 8) & 0xff;
 
-            ESP_LOGI(TAG, "ble rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u, power: %u stroke_average: %u, hr %u }",
+            ESP_LOGI(TAG, "notify rower ftms: { timer: %u, stroke_rate: %.1f, distance: %u, strokes: %u, cal: %u, power: %u stroke_average: %u, hr %u }",
                 elapsed, stroke_rate / 2.0, distance, values.stroke_count, calories, power, stroke_average, heart_rate);
 
             esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_ROWER_DATA_VAL], sizeof(rower_data_value_value), rower_data_value_value, false);
@@ -643,7 +643,7 @@ void notify_ftms_indoor_bike_data(void* p)
         if (s4_get_values(ctx->driver->s4_handle, &values) == ESP_OK)
         {
             uint16_t speed = (uint16_t)(values.current_speed * 60 * 60 / 1000);
-            ESP_LOGI(TAG, "speed %u cm/s, %0.1f km/h", values.current_speed, speed / 100.0f);
+            ESP_LOGI(TAG, "bike speed %u cm/s, %0.1f km/h", values.current_speed, speed / 100.0f);
             uint8_t cadence = values.stroke_rate_x2;
             uint32_t distance = values.distance;
             uint16_t power = values.power;
@@ -677,7 +677,7 @@ void notify_ftms_indoor_bike_data(void* p)
             indoor_bike_data_value[17] = elapsed & 0xff;
             indoor_bike_data_value[18] = (elapsed >> 8) & 0xff;
 
-            ESP_LOGI(TAG, "ble indoor bike ftms: { timer: %u, distance: %u, cadence: %u }", elapsed, distance, cadence);
+            ESP_LOGI(TAG, "notify indoor bike ftms: { timer: %u, distance: %u, cadence: %u }", elapsed, distance, cadence);
 
             esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_VAL], sizeof(indoor_bike_data_value), indoor_bike_data_value, false);
             if (ret != ESP_OK)
@@ -725,7 +725,7 @@ void notify_csc_measurement(void* p)
                 csc_measurement_value[3] = ts & 0xff;
                 csc_measurement_value[4] = (ts >> 8) & 0xff;
 
-                ESP_LOGI(TAG, "ble csc cranks %u ts %u", crank_revs, ts);
+                ESP_LOGI(TAG, "notify csc cranks %u ts %u", crank_revs, ts);
 
                 esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->csc_handle_table[IDX_CSC_MEASUREMENT_VAL], sizeof(csc_measurement_value), csc_measurement_value, false);
                 if (ret != ESP_OK)

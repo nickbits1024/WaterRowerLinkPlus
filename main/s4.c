@@ -12,7 +12,7 @@
 #include "s4.h"
 #include "s4_int.h"
 
-#define TAG "waterrower"
+#define TAG "s4"
 
 s4_variable_t memory_map[] =
 {
@@ -52,6 +52,7 @@ static void s4_client_event_handler(const usb_host_client_event_msg_t* event_msg
         case USB_HOST_CLIENT_EVENT_DEV_GONE:
             ESP_LOGI(TAG, "Device #%d disconnected", driver->dev_addr);
             driver->dev_addr = 0;
+            driver->shutdown_pending = true;
             break;
         default:
             ESP_LOGE(TAG, "Unkown USB client event");
@@ -118,14 +119,20 @@ static void s4_out_transfer_task(void* arg)
 static void s4_in_callback(usb_transfer_t* transfer)
 {
     s4_driver_t* driver = (s4_driver_t*)transfer->context;
+    esp_err_t ret;
 
     if (transfer->status != USB_TRANSFER_STATUS_COMPLETED)
     {
-        ESP_LOGI(TAG, "Inbound USB transfer failure %d~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", transfer->status);
+        ESP_LOGE(TAG, "inbound USB transfer failure (error %d)", transfer->status);
         if (transfer->status != USB_TRANSFER_STATUS_CANCELED)
         {
-            //abort();
-            ESP_ERROR_CHECK(usb_host_transfer_submit(driver->in_transfer));
+            ret = usb_host_transfer_submit(driver->in_transfer);
+            if (ret != ESP_OK)
+            {
+                ESP_LOGE(TAG, "Transfer resubmit failed (error %d)", ret);
+                //ESP_ERROR_CHECK(s4_shutdown(driver));
+                driver->shutdown_pending = true;
+            }
         }
         
         return;
@@ -166,7 +173,7 @@ static void s4_out_callback(usb_transfer_t* transfer)
 
     if (transfer->status != USB_TRANSFER_STATUS_COMPLETED)
     {
-        ESP_LOGI(TAG, "Output USB transfer failure %d~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", transfer->status);
+        ESP_LOGE(TAG, "outbound USB transfer failure (error %d)", transfer->status);
         if (transfer->status != USB_TRANSFER_STATUS_CANCELED)
         {
             abort();
@@ -190,10 +197,12 @@ static void s4_session_task(void* arg)
         }
         ESP_LOGI(TAG, "Power button pressed");
         gpio_set_level(S4_USB_POWER_GPIO_NUM, 1);
-        driver->power_on = true;
-        state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_S4, true);
 
         xSemaphoreTake(driver->device_sem, portMAX_DELAY);
+
+        driver->power_on = true;
+        driver->shutdown_pending = false;
+        state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_S4, true);
 
         ESP_ERROR_CHECK(usb_host_device_open(driver->client_hdl, driver->dev_addr, &driver->dev_hdl));
 
@@ -245,12 +254,13 @@ static void s4_session_task(void* arg)
                 last_last_stroke_start_ts = values.last_stroke_start_ts;
             }
         }
-        while (esp_timer_get_time() - inactive_ts < S4_INACTIVTY_TIMEOUT * 1000000llu);
-        ESP_LOGI(TAG, "Inactivity detected. Shutting down...");
+        while (!driver->shutdown_pending && 
+               esp_timer_get_time() - inactive_ts < S4_INACTIVTY_TIMEOUT * 1000000llu);
+        
+        ESP_LOGI(TAG, "shutting down...");
         ESP_ERROR_CHECK(s4_shutdown(driver));
-        gpio_set_level(S4_USB_POWER_GPIO_NUM, 0);
-        driver->power_on = false;
-        state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_S4, false);
+
+        ESP_LOGI(TAG, "session ended");
 
         driver->dev_hdl = NULL;
     }
@@ -310,6 +320,11 @@ static esp_err_t s4_shutdown(s4_driver_t* driver)
     ESP_ERROR_CHECK(usb_host_device_close(driver->client_hdl, driver->dev_hdl));
     driver->dev_hdl = NULL;
     driver->dev_addr = 0;
+
+    gpio_set_level(S4_USB_POWER_GPIO_NUM, 0);
+    driver->power_on = false;
+    driver->shutdown_pending = false;
+    state_manager_set_component_state(driver->sm_handle, STATE_MANAGER_COMPONENT_S4, false);
 
     return ESP_OK;
 }

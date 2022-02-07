@@ -1,4 +1,5 @@
 #define S4_INACTIVTY_TIMEOUT        (60 * 30)
+//#define S4_INACTIVTY_TIMEOUT        60
 
 #define S4_MAX_PACKET_SIZE          64
 #define S4_USB_ENDPOINT_OUT_ADDRESS 0x03
@@ -79,4 +80,5 @@ typedef struct
     state_manager_handle_t sm_handle;
     hrm_handle_t hrm_handle;
     bool power_on;
+    volatile bool shutdown_pending;
 } s4_driver_t;
