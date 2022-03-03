@@ -4069,7 +4069,7 @@
     (uuid 7256d11a-14ff-445c-a438-bcd70efc9185)
     (property "Reference" "U5" (id 0) (at 134.62 177.8 0))
     (property "Value" "AP7361C-33E" (id 1) (at 134.62 180.34 0))
-    (property "Footprint" "Package_TO_SOT_SMD:SOT-223-3_TabPin2" (id 2) (at 134.62 179.705 0)
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-223" (id 2) (at 134.62 179.705 0)
       (effects (font (size 1.27 1.27) italic) hide)
     )
     (property "Datasheet" "https://www.diodes.com/assets/Datasheets/AP7361C.pdf" (id 3) (at 134.62 186.69 0)
@@ -4941,7 +4941,7 @@
       (reference "U4") (unit 1) (value "CP2102N-Axx-xQFN24") (footprint "Package_DFN_QFN:QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm")
     )
     (path "/7256d11a-14ff-445c-a438-bcd70efc9185"
-      (reference "U5") (unit 1) (value "AP7361C-33E") (footprint "Package_TO_SOT_SMD:SOT-223-3_TabPin2")
+      (reference "U5") (unit 1) (value "AP7361C-33E") (footprint "Package_TO_SOT_SMD:SOT-223")
     )
     (path "/ac99ef1b-ad4b-44a0-888a-006344fe47f5"
       (reference "U6") (unit 1) (value "SP0506BAATG") (footprint "Package_SO:MSOP-8_3x3mm_P0.65mm")

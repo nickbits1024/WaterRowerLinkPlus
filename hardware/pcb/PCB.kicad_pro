@@ -386,6 +386,7 @@
         "name": "5V",
         "nets": [
           "ESD_VBUS",
+          "S4_VBUS",
           "VBUS"
         ],
         "pcb_color": "rgba(0, 0, 0, 0.000)",
