@@ -33,7 +33,7 @@ s4_variable_t memory_map[] =
 static void s4_in_event(s4_driver_t* driver);
 static esp_err_t s4_setup(s4_driver_t* driver);
 static esp_err_t s4_shutdown(s4_driver_t* driver);
-static void s4_read_memory(s4_driver_t* driver, const s4_variable_t* var);
+static esp_err_t s4_read_memory(s4_driver_t* driver, const s4_variable_t* var);
 static void s4_heart_beat_task(void* param);
 
 static void s4_client_event_handler(const usb_host_client_event_msg_t* event_msg, void* arg)
@@ -69,7 +69,10 @@ static esp_err_t s4_command(s4_driver_t* driver, const char* cmd, const char* re
         return ESP_ERR_INVALID_ARG;
     }
 
-    xSemaphoreTake(driver->cmd_sem, portMAX_DELAY);
+    if (!xSemaphoreTake(driver->cmd_sem, S4_COMMAND_TIMEOUT / portTICK_PERIOD_MS))
+    {
+        return ESP_ERR_TIMEOUT;
+    }
 
     char* buffer = (char*)driver->out_transfer->data_buffer;
     driver->out_transfer->num_bytes = length + 2;
@@ -90,7 +93,10 @@ static esp_err_t s4_command(s4_driver_t* driver, const char* cmd, const char* re
     driver->wait_buffer_size = strlen(resp);
 
     xSemaphoreGive(driver->out_sem);
-    xSemaphoreTake(driver->out_resp_sem, portMAX_DELAY);
+    if (!xSemaphoreTake(driver->out_resp_sem, S4_COMMAND_TIMEOUT / portTICK_PERIOD_MS))
+    {
+        return ESP_ERR_TIMEOUT;
+    }
 
     return ESP_OK;
 }
@@ -243,9 +249,17 @@ static void s4_session_task(void* arg)
         {
             for (int i = 0; i < S4_MEMORY_MAP_SIZE; i++)
             {
-                s4_read_memory(driver, &memory_map[i]);
+                if (s4_read_memory(driver, &memory_map[i]) != ESP_OK)
+                {
+                    driver->shutdown_pending = true;
+                    break;
+                }
             }
 
+            if (driver->shutdown_pending)
+            {
+                break;
+            }
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             ESP_ERROR_CHECK(s4_get_values(driver, &values));
             if (last_last_stroke_start_ts != values.last_stroke_start_ts)
@@ -290,11 +304,7 @@ static esp_err_t s4_setup(s4_driver_t* driver)
 
     xTaskCreate(s4_out_transfer_task, "wr_out_transfer_task", 4096, driver, 23, &driver->out_transfer_task_handle);
 
-    s4_command(driver, S4_COMMAND_USB, S4_COMMAND_USB_RESPONSE);
-
-
-
-    //xTaskCreate(s4_poll_task, "s4_poll_task", 4096, driver, 23, &driver->poll_task_handle);
+    ESP_ERROR_CHECK(s4_command(driver, S4_COMMAND_USB, S4_COMMAND_USB_RESPONSE));
 
     return ESP_OK;
 }
@@ -392,7 +402,7 @@ esp_err_t s4_init(state_manager_handle_t sm_handle, hrm_handle_t hrm_handle, s4_
     return ESP_OK;
 }
 
-static void s4_read_memory(s4_driver_t* driver, const s4_variable_t* var)
+static esp_err_t s4_read_memory(s4_driver_t* driver, const s4_variable_t* var)
 {
     char cmd[S4_MAX_COMMAND_SIZE];
     snprintf(cmd, S4_MAX_COMMAND_SIZE, "IR%c%03X", var->size, var->address);
@@ -400,22 +410,8 @@ static void s4_read_memory(s4_driver_t* driver, const s4_variable_t* var)
     char resp[S4_MAX_COMMAND_SIZE];
     snprintf(resp, S4_MAX_COMMAND_SIZE, "ID%c%03X", var->size, var->address);
 
-    s4_command(driver, cmd, resp);
+    return s4_command(driver, cmd, resp);
 }
-
-// static void s4_poll_task(void* arg)
-// {
-//     s4_driver_t* driver = (s4_driver_t*)arg;
-//     for (;;)
-//     {
-//         for (int i = 0; i < S4_MEMORY_MAP_SIZE; i++)
-//         {
-//             s4_read_memory(driver, &memory_map[i]);
-//         }
-
-//         vTaskDelay(1000 / portTICK_PERIOD_MS);
-//     }
-// }
 
 esp_err_t s4_get_values(s4_handle_t s4_handle, s4_values_t* values)
 {

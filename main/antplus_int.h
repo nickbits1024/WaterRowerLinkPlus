@@ -35,9 +35,9 @@
 #define ANTPLUS_UART_RX_BUFFER_SIZE         1024
 #define ANTPLUS_UART_TX_BUFFER_SIZE         0
 
-#define ANTPLUS_CTS_GPIO_NUM                GPIO_NUM_16
+#define ANTPLUS_CTS_GPIO_NUM                GPIO_NUM_18
 #define ANTPLUS_TX_GPIO_NUM                 GPIO_NUM_17
-#define ANTPLUS_RX_GPIO_NUM                 GPIO_NUM_18
+#define ANTPLUS_RX_GPIO_NUM                 GPIO_NUM_16
 
 #define ANTPLUS_RESET_GPIO_NUM              GPIO_NUM_15
 #define ANTPLUS_RESET_GPIO_SEL              GPIO_SEL_15

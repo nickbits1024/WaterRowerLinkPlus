@@ -1,5 +1,6 @@
 #define S4_INACTIVTY_TIMEOUT        (60 * 30)
 //#define S4_INACTIVTY_TIMEOUT        60
+#define S4_COMMAND_TIMEOUT          5000
 
 #define S4_MAX_PACKET_SIZE          64
 #define S4_USB_ENDPOINT_OUT_ADDRESS 0x03
