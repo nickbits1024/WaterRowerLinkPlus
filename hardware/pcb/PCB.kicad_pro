@@ -347,9 +347,7 @@
       "Espressif",
       "MyParts"
     ],
-    "pinned_symbol_libs": [
-      "MyParts"
-    ]
+    "pinned_symbol_libs": []
   },
   "meta": {
     "filename": "PCB.kicad_pro",
