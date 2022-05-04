@@ -1,4 +1,4 @@
-19854487513753390
+19898788924799609
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -78203,6 +78203,223 @@ https://www.farnell.com/cad/316865.pdf?_ga=2.37208032.177107060.1530611323-24901
 0
 48
 48
+Stormboard Keyboard
+CHERRY_MX_DIODE
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_MX_LED
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_100H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_125H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_150H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_175H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_200H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_200V
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_225H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_275H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PCB_625H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_100H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_125H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_150H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_175H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_200H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_200V
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_225H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_275H
+
+
+0
+2
+2
+Stormboard Keyboard
+CHERRY_PLATE_625H
+
+
+0
+2
+2
+Stormboard Keyboard
+C_0805
+Capacitor SMD 0805, reflow soldering, AVX (see smccp.pdf)
+capacitor 0805
+0
+2
+2
+Stormboard Keyboard
+DIODE
+
+
+0
+2
+2
+Stormboard Keyboard
+LED_3MM
+
+
+0
+2
+2
+Stormboard Keyboard
+MSOP-8-PowerPad
+
+
+0
+9
+9
+Stormboard Keyboard
+MUSB-X151-XX
+
+
+0
+5
+5
+Stormboard Keyboard
+MUSBR-A111-XX
+
+
+0
+4
+4
+Stormboard Keyboard
+MUSBX-A111-XX
+
+
+0
+4
+4
+Stormboard Keyboard
+RESISTOR
+
+
+0
+2
+2
+Stormboard Keyboard
+R_0805
+Resistor SMD 0805, reflow soldering, Vishay (see dcrcw.pdf)
+resistor 0805
+0
+2
+2
+Stormboard Keyboard
+SOJ-2
+
+
+0
+2
+2
+Stormboard Keyboard
+TEENSY_2.0
+
+
+0
+31
+31
 Symbol
 CE-Logo_8.5x6mm_SilkScreen
 CE marking
