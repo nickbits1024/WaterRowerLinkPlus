@@ -1,0 +1,38 @@
+"Source:","C:\Users\nickb\Documents\esp-idf\WaterRowerLinkPlus\hardware\breadboard\Breadboard.kicad_sch"
+"Date:","5/6/2022 6:08:07 PM"
+"Tool:","Eeschema (6.0.1)"
+"Generator:","C:\Program Files\KiCad\6.0\bin\scripting\plugins/bom_csv_grouped_by_value.py"
+"Component Count:","12"
+
+"Individual Components:"
+
+"Item","Qty","Reference(s)","Value","LibPart","Footprint","Datasheet"
+"","","C1","1uF","Device:C","Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm","~"
+"","","C2","0.1uF","Device:C","Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm","~"
+"","","J1","AudioPlug3","Connector:AudioPlug3","","~"
+"","","J2","Conn_01x04_Male","Connector:Conn_01x04_Male","","~"
+"","","J3","Conn_01x04_Female","Connector:Conn_01x04_Female","Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical","~"
+"","","J4","USB_A","Connector:USB_A",""," ~"
+"","","R1","10k","Device:R","Resistor_THT:R_Box_L13.0mm_W4.0mm_P9.00mm","~"
+"","","R2","10k","Device:R","Resistor_THT:R_Box_L13.0mm_W4.0mm_P9.00mm","~"
+"","","SW1","SW_Push","Switch:SW_Push","Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical","~"
+"","","U1","ESP32-S3-DevKitC-1","MyParts:ESP32-S3-DevKitC-1","MyParts:ESP32_S3_DevKitC-1",""
+"","","U2","LM3525M-H","MyParts:LM3525M-H","Package_DIP:DIP-8_W7.62mm",""
+"","","U3","D52QD2M6IA","MyParts:D52QD2M6IA","Connector_PinHeader_2.54mm:PinHeader_2x10_P2.54mm_Vertical",""
+
+
+
+"Collated Components:"
+
+"Item","Qty","Reference(s)","Value","LibPart","Footprint","Datasheet"
+"1","1","C1","1uF","Device:C","Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm","~"
+"2","1","C2","0.1uF","Device:C","Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm","~"
+"3","1","J1","AudioPlug3","Connector:AudioPlug3","","~"
+"4","1","J2","Conn_01x04_Male","Connector:Conn_01x04_Male","","~"
+"5","1","J3","Conn_01x04_Female","Connector:Conn_01x04_Female","Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical","~"
+"6","1","J4","USB_A","Connector:USB_A",""," ~"
+"7","2","R1, R2","10k","Device:R","Resistor_THT:R_Box_L13.0mm_W4.0mm_P9.00mm","~"
+"8","1","SW1","SW_Push","Switch:SW_Push","Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical","~"
+"9","1","U1","ESP32-S3-DevKitC-1","MyParts:ESP32-S3-DevKitC-1","MyParts:ESP32_S3_DevKitC-1",""
+"10","1","U2","LM3525M-H","MyParts:LM3525M-H","Package_DIP:DIP-8_W7.62mm",""
+"11","1","U3","D52QD2M6IA","MyParts:D52QD2M6IA","Connector_PinHeader_2.54mm:PinHeader_2x10_P2.54mm_Vertical",""

@@ -677,7 +677,7 @@ void notify_ftms_indoor_bike_data(void* p)
             indoor_bike_data_value[17] = elapsed & 0xff;
             indoor_bike_data_value[18] = (elapsed >> 8) & 0xff;
 
-            ESP_LOGI(TAG, "notify indoor bike ftms: { timer: %u, distance: %u, cadence: %u }", elapsed, distance, cadence);
+            ESP_LOGI(TAG, "notify indoor bike ftms: { timer: %u, distance: %u, cadence: %u, hr: %u }", elapsed, distance, cadence, hr);
 
             esp_err_t ret = esp_ble_gatts_send_indicate(ctx->gatts_if, ctx->conn_id, ctx->driver->ftms_handle_table[IDX_FTMS_INDOOR_BIKE_DATA_VAL], sizeof(indoor_bike_data_value), indoor_bike_data_value, false);
             if (ret != ESP_OK)
