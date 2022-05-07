@@ -112,6 +112,11 @@ Watch YouTube tutorials on how to do SMD soldering. I had good luck using a sten
 
 ![Components](docs/Connections.jpg)
 
+### Required Software
+- [Visual Studio Code](https://code.visualstudio.com/download)
+- [Visual Studio Code Espressif IDF extension](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension)
+- [ESP-IDF](https://dl.espressif.com/dl/esp-idf/) Built using commit 0132079fa51f2c130513dd634e97ef9726f00e85
+
 ### Equipment Used
 - Soldering Iron: [YIHUA 995D+](https://www.amazon.com/gp/product/B0919MS875)
 - PCB Hot Plate: [MINIWARE MHP30M Mini Hot Plate](https://www.amazon.com/gp/product/B08R6XFPKR)
