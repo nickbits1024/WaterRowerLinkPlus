@@ -1,4 +1,4 @@
-20257127036871964
+20258781898528085
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -60129,6 +60129,13 @@ D52Q
 0
 34
 34
+MyParts
+QFN50P500X500X80-33N
+32 TQFN-EP(T3255-4)_1
+Integrated Circuit
+0
+33
+33
 NetTie
 NetTie-2_SMD_Pad0.5mm
 Net tie, 2 pin, 0.5mm square SMD pads

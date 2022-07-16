@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>C:\Users\nickb\Documents\esp-idf\WaterRowerLinkPlus\hardware\pcb\PCB.kicad_sch</source>
-    <date>5/3/2022 8:25:46 PM</date>
-    <tool>Eeschema (6.0.1)</tool>
+    <source>C:\Users\nickb\Documents\esp-idf\WaterRowerLinkPlus\hardware\PCB\PCB.kicad_sch</source>
+    <date>7/16/2022 12:26:23 PM</date>
+    <tool>Eeschema (6.0.5)</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
         <title>WaterRowerLink+</title>
@@ -947,7 +947,7 @@
       <node ref="J3" pin="1" pinfunction="VBUS" pintype="power_out"/>
       <node ref="U6" pin="4" pintype="passive"/>
     </net>
-    <net code="13" name="Earth">
+    <net code="13" name="GND">
       <node ref="C1" pin="1" pintype="passive"/>
       <node ref="C10" pin="2" pintype="passive"/>
       <node ref="C11" pin="2" pintype="passive"/>
