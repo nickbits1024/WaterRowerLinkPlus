@@ -116,12 +116,12 @@ bool antplus_decode_message(antplus_driver_t* driver, uint8_t* packet, uint8_t p
         return false;
     }
 
-    printf("msg");
-    for (int i = 0; i < packet_size; i++)
-    {
-        printf(" %02x", packet[i]);
-    }
-    printf("\n");
+    // printf("msg");
+    // for (int i = 0; i < packet_size; i++)
+    // {
+    //     printf(" %02x", packet[i]);
+    // }
+    // printf("\n");
 
     uint8_t checksum = 0;
     for (int i = 0; i < packet_size; i++)
@@ -185,16 +185,16 @@ void antplus_recv_task(void* param)
         {
             to_read = ANTPLUS_MAX_MESSAGE_SIZE;
         }
-        printf("request %u\n", to_read);
+        //printf("request %u\n", to_read);
         int read = uart_read_bytes(driver->uart_num, buffer, to_read, portMAX_DELAY);
         if (read > 0)
         {
-            printf("read");
-            for (int i = 0; i < read; i++)
-            {
-                printf(" %02x", buffer[i]);
-            }
-            printf("\n");
+            // printf("read");
+            // for (int i = 0; i < read; i++)
+            // {
+            //     printf(" %02x", buffer[i]);
+            // }
+            // printf("\n");
             for (int i = 0; i < read; i++)
             {
                 if ((msg_size == 0 && (ANTPLUS_SYNC_BYTE_MASK & buffer[i]) == ANTPLUS_SYNC_BYTE_VALUE) || msg_size > 0)
@@ -226,12 +226,12 @@ esp_err_t antplus_send_message(antplus_driver_t* driver, antplus_message_t* msg)
 
     uint8_t padding[2] = { 0 };
 
-    printf("write (size %u, cts %u): ", msg_size, gpio_get_level(ANTPLUS_CTS_GPIO_NUM));
-    for (int i = 0; i < msg_size; i++)
-    {
-        printf(" %02x", msg_buffer[i]);
-    }
-    printf("\n");
+    // printf("write (size %u, cts %u): ", msg_size, gpio_get_level(ANTPLUS_CTS_GPIO_NUM));
+    // for (int i = 0; i < msg_size; i++)
+    // {
+    //     printf(" %02x", msg_buffer[i]);
+    // }
+    // printf("\n");
     int written = uart_write_bytes(driver->uart_num, msg, msg_size);
     uart_write_bytes(driver->uart_num, padding, 2);
 

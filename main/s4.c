@@ -361,7 +361,7 @@ esp_err_t s4_preinit()
     io_conf.intr_type = GPIO_INTR_DISABLE;
 
     gpio_config(&io_conf);
-    //vTaskDelay(50 / portTICK_PERIOD_MS);
+    vTaskDelay(50 / portTICK_PERIOD_MS);
 
     return ESP_OK;
 }
