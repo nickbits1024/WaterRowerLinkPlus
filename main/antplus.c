@@ -116,12 +116,12 @@ bool antplus_decode_message(antplus_driver_t* driver, uint8_t* packet, uint8_t p
         return false;
     }
 
-    // printf("msg");
-    // for (int i = 0; i < packet_size; i++)
-    // {
-    //     printf(" %02x", packet[i]);
-    // }
-    // printf("\n");
+    printf("msg");
+    for (int i = 0; i < packet_size; i++)
+    {
+        printf(" %02x", packet[i]);
+    }
+    printf("\n");
 
     uint8_t checksum = 0;
     for (int i = 0; i < packet_size; i++)
@@ -388,10 +388,10 @@ esp_err_t antplus_reset(antplus_handle_t antplus_handle)
     ESP_ERROR_CHECK(uart_flush(driver->uart_num));
 
     ESP_ERROR_CHECK(gpio_set_level(ANTPLUS_RESET_GPIO_NUM, 0));
-    vTaskDelay(100 / portTICK_PERIOD_MS);   
+    vTaskDelay(500 / portTICK_PERIOD_MS);   
 
     ESP_ERROR_CHECK(gpio_set_level(ANTPLUS_RESET_GPIO_NUM, 1));
-    //vTaskDelay(500 / portTICK_PERIOD_MS);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
 
     return ESP_OK;
 }

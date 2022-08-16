@@ -48,21 +48,6 @@ void app_main(void)
     ble_handle_t ble_handle;
     state_manager_handle_t sm_handle;
 
-    //vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-    // gpio_config_t io_conf;
-
-    // io_conf.pin_bit_mask = GPIO_SEL_46;
-    // io_conf.mode = GPIO_MODE_OUTPUT;
-    // io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    // io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    // io_conf.intr_type = GPIO_INTR_DISABLE;
-
-    // gpio_config(&io_conf);
-
-    // gpio_set_level(GPIO_NUM_46, 1);
-    // return;
-
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
