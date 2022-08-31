@@ -3536,7 +3536,7 @@
     (property "Value" "RESET" (id 1) (at 62.23 40.64 90)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (id 2) (at 64.77 41.91 0)
+    (property "Footprint" "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical" (id 2) (at 64.77 41.91 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 64.77 41.91 0)
@@ -4191,7 +4191,7 @@
     (uuid 761492e2-a989-4596-80c3-fcd6943df072)
     (property "Reference" "SW2" (id 0) (at 25.4 72.39 0))
     (property "Value" "S4" (id 1) (at 25.4 69.85 0))
-    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (id 2) (at 25.4 62.23 0)
+    (property "Footprint" "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical" (id 2) (at 25.4 62.23 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 25.4 62.23 0)
@@ -4996,13 +4996,13 @@
       (reference "SW1") (unit 1) (value "RESET") (footprint "Button_Switch_SMD:SW_Push_1P1T_NO_6x6mm_H9.5mm")
     )
     (path "/761492e2-a989-4596-80c3-fcd6943df072"
-      (reference "SW2") (unit 1) (value "S4") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical")
+      (reference "SW2") (unit 1) (value "S4") (footprint "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical")
     )
     (path "/39878562-d955-4b7e-bbe7-a787f143b36a"
       (reference "SW3") (unit 1) (value "BOOT") (footprint "Button_Switch_SMD:SW_Push_1P1T_NO_6x6mm_H9.5mm")
     )
     (path "/00e0a510-b77b-4e90-ac6f-b11958449141"
-      (reference "SW4") (unit 1) (value "RESET") (footprint "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical")
+      (reference "SW4") (unit 1) (value "RESET") (footprint "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical")
     )
     (path "/901fa854-b4f7-4cd6-81a2-bc814b2d6c79"
       (reference "U1") (unit 1) (value "ESP32-S3-WROOM-1") (footprint "Espressif:ESP32-S3-WROOM-1")
