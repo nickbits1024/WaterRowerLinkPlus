@@ -1,7 +1,5 @@
 # WaterRower Link+
 
-*THESE INSTRUCTIONS ARE A WORK IN PROGRESS.  PLEASE CONTACT ME THROUGH GITHUB IF YOU NEED HELP.*
-
 ## Description
 WaterRower Link+ is a bluetooth module designed for any WaterRower with the S4 monitor.  It provides all the functionality of the official WaterRower ComModule as well as many additional features.
 
