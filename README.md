@@ -34,7 +34,7 @@ WaterRower Link+ is a bluetooth module designed for any WaterRower with the S4 m
 ![Components](docs/Components.png)
 
 ## Hardware
-Hardware design is available in the KiCad projects in this repo.  There are two versions, [breadboard](hardware/breadboard/) and [PCB](hardware/pcb/).  With the breadboard version, everything can be assembled using dev boards and jumper wires. [^1]  Both solderless and soldered breadboards were tested and work.  The PCB version requires the design be sent to a PCB manufacturer.  Either one can be a fun project depending on your skill level.
+Hardware design is available in the KiCad projects in this repo.  There are two versions, [breadboard](hardware/breadboard/) and [PCB](hardware/pcb/).  With the breadboard version, everything can be assembled using dev boards and jumper wires. [^1]  Both solderless and soldered breadboards were tested and work.  The PCB version requires the design be sent to a PCB manufacturer.
 
 ### Soldered Breadboard Version
 ![Components](docs/BB_Assembled.jpg)
@@ -98,13 +98,6 @@ Hardware design is available in the KiCad projects in this repo.  There are two 
 |1|USB Cable|3896|Mini USB|[Monoprice](https://www.monoprice.com/product?p_id=3896)
 |1|Light Pipe||RA|[Digi-Key](https://www.digikey.com/en/products/detail/dialight/51513620375F/9742144)
 
-## PCB Ordering Instructions
-I recommend using [JLCPCB](http://www.jlcpcb.com).  5 PCBs with a paste stencil and shipping for less than $20.  The cheapest shipping option takes about a month to arrive.
-The gerber files needed for fabrication are included in the repo (hardware/pcb/*.gbr).  JCL PCB contacted me about which layer to use for the paste stencil (paste or solder mask).  The paste layer is correct for that.  I do not know why the footprints I used made that questionable but using the paste layer worked fine.
-
-## PCB Assembly Tips
-Watch YouTube tutorials on how to do SMD soldering. I had good luck using a stencil for the solder paste, laying out all components then using a mix of the hot plate and hot air to solder (with some touch ups with the iron).  This was my first SMD project and I was able to make it work with some patience.  The CP2012N, followed by the D52Q are the most difficult to solder.
-
 ## Cable Connections
 1. Attach mini USB cable to S4 monitor and WaterRower Link+
 2. Attach 3.5mm cable to S4 monitor and WaterRower Link+.  The recommended cable will fit in the narrow gap of an M1 rower and the monitor.
@@ -129,9 +122,6 @@ Note the software only supports one HRM.  If multiple are detected, only the fir
 
 ## Known Issues
 - The last update to VZfit displays HR in the HUD however the value does not appear correct.  It may be a bug with WRL+ or VZfit.
-
-## Where To Buy
-Unfortunately this hardware is not for sale.  You must purchase the parts and build it yourself.  I had hoped to sell a few boards for fun but I later discovered things like this need some FCC testing (unintentional radiator) and that can run between $1,000 and $2,000—something I am not willing to spend as I will never recoup the costs.
 
 ## Credits
 This project was inspired by [PiRowFlow](https://github.com/inonoob/pirowflo)
