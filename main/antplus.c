@@ -357,7 +357,9 @@ esp_err_t antplus_init(state_manager_handle_t sm_handle, hrm_handle_t* hrm_handl
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_CTS
+        .flow_ctrl = UART_HW_FLOWCTRL_CTS,
+        //.rx_flow_ctrl_thresh = 122
+        .source_clk = UART_SCLK_DEFAULT
     };
 
     ESP_ERROR_CHECK(uart_param_config(driver->uart_num, &uart_config));

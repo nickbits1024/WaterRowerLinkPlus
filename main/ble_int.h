@@ -1,5 +1,7 @@
 #define BLE_NOTIFY_TASKS_MAX        10
 
+#define BLE_AD_INTERVAL             (8000) // 5s
+
 #define PROFILE_NUM                 1
 #define PROFILE_APP_IDX             0
 #define WATERROWER_SERVER_APP_ID    0
@@ -48,6 +50,9 @@ enum
     IDX_FTMS_INDOOR_BIKE_DATA_CFG,
     IDX_FTMS_CONTROL_POINT,
     IDX_FTMS_CONTROL_POINT_VAL,
+    IDX_FTMS_STATUS,
+    IDX_FTMS_STATUS_VAL,
+    IDX_FTMS_STATUS_CFG,
     FTMS_IDX_NB
 };
 

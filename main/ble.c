@@ -4,6 +4,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "esp_timer.h"
 #include "esp_bt.h"
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
@@ -22,13 +23,16 @@ static uint8_t raw_adv_data[] = {
     /* tx power*/
     //0x02, 0x0a, 0xeb,
     /* service uuid */
-    0x07, 0x03, 0x16, 0x18, 0x0d, 0x18, 0x26, 0x18,
+    //0x07, 0x03, 0x16, 0x18, 0x0d, 0x18, 0x26, 0x18,
+    0x03, 0x01, 0x16, 0x18,
     /* device name */
-    0x05, 0x09, 'W', 'R', 'L', '+',
-    /* manufactuer data */
-    0x05, 0xff,0xff, 0xff, 0x77, 0x72
+    0x0a, 0x09, 'C', 'o', 'm', 'M', 'o', 'd', 'u', 'l', 'e',
+    /* manufacturer data */
+    0x05, 0xff,0xff, 0xff, 0x77, 0x72,
     /* ftms service rower + indoor bike data*/
     //0x06, 0x16, 0x26, 0x18, 0x01, 0b00110000, 0b00000000,
+    /* ftms service rower */
+    0x06, 0x16, 0x26, 0x18, 0x01, 0b00010000, 0b00000000,
 };
 
 // static uint8_t raw_scan_rsp_data[] = {
@@ -39,12 +43,12 @@ static uint8_t raw_adv_data[] = {
 //     //0x07, 0x26, 0x18,
 //     /* service uuid */
 //     //0x05, 0x03, 0x16, 0x18, 0x0d, 0x18
-//     0x0f, 0x09, 'W', 'a', 't', 'e', 'r', 'R', 'o', 'w', 'e', 'r', 'L', 'i', 'n', 'k', '+',
+//     0x0f, 0x09, 'W', 'a', 't', 'e', 'r', 'R', 'o', 'w', 'e', 'r', 'L', 'i', 'n', 'k', 'X',
 // };
 
 static esp_ble_adv_params_t adv_params = {
-    .adv_int_min = 0x20,
-    .adv_int_max = 0x40,
+    .adv_int_min = BLE_AD_INTERVAL,
+    .adv_int_max = BLE_AD_INTERVAL,
     .adv_type = ADV_TYPE_IND,
     .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
     .channel_map = ADV_CHNL_ALL,
@@ -80,11 +84,11 @@ notify_task_t notify_tasks[BLE_NOTIFY_TASKS_MAX];
 portMUX_TYPE notify_tasks_mux = portMUX_INITIALIZER_UNLOCKED;
 ble_driver_t* ble_handler_driver;
 
-static const uint16_t cycling_speed_cadence_svc_uuid = ESP_GATT_UUID_CYCLING_SPEED_CADENCE_SVC;
-static const uint16_t csc_measurement_uuid = ESP_GATT_UUID_CSC_MEASUREMENT;
-static const uint16_t csc_feature_uuid = ESP_GATT_UUID_CSC_FEATURE;
-static const uint16_t sensor_location_uuid = ESP_GATT_UUID_SENSOR_LOCATION;
-static const uint16_t sc_control_point_uuid = ESP_GATT_UUID_SC_CONTROL_POINT;
+// static const uint16_t cycling_speed_cadence_svc_uuid = ESP_GATT_UUID_CYCLING_SPEED_CADENCE_SVC;
+// static const uint16_t csc_measurement_uuid = ESP_GATT_UUID_CSC_MEASUREMENT;
+// static const uint16_t csc_feature_uuid = ESP_GATT_UUID_CSC_FEATURE;
+// static const uint16_t sensor_location_uuid = ESP_GATT_UUID_SENSOR_LOCATION;
+// static const uint16_t sc_control_point_uuid = ESP_GATT_UUID_SC_CONTROL_POINT;
 
 static const uint16_t hr_svc_uuid = ESP_GATT_UUID_HEART_RATE_SVC;
 static const uint16_t hr_measurement_uuid = ESP_GATT_HEART_RATE_MEAS;
@@ -96,6 +100,7 @@ static const uint16_t ftms_feature_uuid = 0x2acc;
 static const uint16_t ftms_rower_data_uuid = 0x2ad1;
 static const uint16_t ftms_indoor_bike_data_uuid = 0x2ad2;
 static const uint16_t ftms_control_point_uuid = 0x2ad9;
+static const uint16_t ftms_status_uuid = 0x2ada;
 
 static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t character_declaration_uuid = ESP_GATT_UUID_CHAR_DECLARE;
@@ -118,16 +123,18 @@ static const uint8_t hr_body_sensor_location_value[1] = { 0x00 };
 
 static const uint8_t ftms_rower_data_ccc[2] = { 0x00, 0x00 };
 static const uint8_t ftms_indoor_bike_data_ccc[2] = { 0x00, 0x00 };
+static const uint8_t ftms_status_ccc[2] = { 0x00, 0x00 };
 
 static const uint8_t ftms_feature_value[8] =
 {
-    FTMS_FEATURE_CADENCE_SUPPORTED | 
-    FTMS_FEATURE_TOTAL_DISTANCE_SUPPORTED | 
-    FTMS_FEATURE_PACE_SUPPORTED,
-    (FTMS_FEATURE_EXPENDED_ENERGY_SUPPORTED | 
-    FTMS_FEATURE_HEART_RATE_MEASUREMENT_SUPPORTED | 
-    FTMS_FEATURE_ELAPSED_TIME_SUPPORTED |
-    FTMS_FEATURE_POWER_MEASUREMENT_SUPPORTED) >> 8,
+    // FTMS_FEATURE_CADENCE_SUPPORTED | 
+    // FTMS_FEATURE_TOTAL_DISTANCE_SUPPORTED | 
+    // FTMS_FEATURE_PACE_SUPPORTED,
+    // (FTMS_FEATURE_EXPENDED_ENERGY_SUPPORTED | 
+    // FTMS_FEATURE_HEART_RATE_MEASUREMENT_SUPPORTED | 
+    // FTMS_FEATURE_ELAPSED_TIME_SUPPORTED |
+    // FTMS_FEATURE_POWER_MEASUREMENT_SUPPORTED) >> 8,
+    0xff, 0xff,
     0, 0,
     0, 0, 0, 0
 };
@@ -164,20 +171,20 @@ static const esp_gatts_attr_db_t gatt_ftms_db[FTMS_IDX_NB] =
         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
         sizeof(uint16_t), sizeof(ftms_rower_data_ccc), (uint8_t*)ftms_rower_data_ccc}},
 
-    // Indoor Bike Data
-    [IDX_FTMS_INDOOR_BIKE_DATA] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
-        CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_notify}},
+    // // Indoor Bike Data
+    // [IDX_FTMS_INDOOR_BIKE_DATA] =
+    //     {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
+    //     CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_notify}},
 
-    // Indoor Bike Data Value
-    [IDX_FTMS_INDOOR_BIKE_DATA_VAL] =
-        {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&ftms_indoor_bike_data_uuid, 0,
-        sizeof(uint16_t), 0, NULL}},
+    // // Indoor Bike Data Value
+    // [IDX_FTMS_INDOOR_BIKE_DATA_VAL] =
+    //     {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&ftms_indoor_bike_data_uuid, 0,
+    //     sizeof(uint16_t), 0, NULL}},
 
-    // Indoor Bike Data Config
-    [IDX_FTMS_INDOOR_BIKE_DATA_CFG] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-        sizeof(uint16_t), sizeof(ftms_indoor_bike_data_ccc), (uint8_t*)ftms_indoor_bike_data_ccc}},
+    // // Indoor Bike Data Config
+    // [IDX_FTMS_INDOOR_BIKE_DATA_CFG] =
+    //     {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+    //     sizeof(uint16_t), sizeof(ftms_indoor_bike_data_ccc), (uint8_t*)ftms_indoor_bike_data_ccc}},
 
     // FTMS Control Point
     [IDX_FTMS_CONTROL_POINT] =
@@ -189,59 +196,74 @@ static const esp_gatts_attr_db_t gatt_ftms_db[FTMS_IDX_NB] =
         {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&ftms_control_point_uuid, ESP_GATT_PERM_WRITE,
         GATTS_DEMO_CHAR_VAL_LEN_MAX, 0, NULL}},
 
-};
-
-static const esp_gatts_attr_db_t gatt_csc_db[CSC_IDX_NB] =
-{
-    // CSC Service
-    [IDX_CSC_SVC] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&primary_service_uuid, ESP_GATT_PERM_READ,
-        sizeof(uint16_t), sizeof(cycling_speed_cadence_svc_uuid), (uint8_t*)&cycling_speed_cadence_svc_uuid}},
-
-        // CSC Measurement
-    [IDX_CSC_MEASUREMENT] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+    // FTMS Status
+    [IDX_FTMS_STATUS] =
+        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_notify}},
 
-    // CSC Measurement Value
-    [IDX_CSC_MEASUREMENT_VAL] =
-        {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&csc_measurement_uuid, 0,
+    // FTMS Status Value
+    [IDX_FTMS_STATUS_VAL] =
+        {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&ftms_status_uuid, ESP_GATT_PERM_WRITE,
         GATTS_DEMO_CHAR_VAL_LEN_MAX, 0, NULL}},
 
-    // CSC Measurement Config
-    [IDX_CSC_MEASUREMENT_CFG] =
+    // FTMS Status Config
+    [IDX_FTMS_STATUS_CFG] =
         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
-        sizeof(uint16_t), sizeof(csc_measurement_ccc), (uint8_t*)csc_measurement_ccc}},
+        sizeof(uint16_t), sizeof(ftms_status_ccc), (uint8_t*)ftms_status_ccc}},
 
-    /// CSC Feature
-    [IDX_CSC_FEATURE] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
-        CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_read}},
-
-    // CSC Feature Value
-    [IDX_CSC_FEATURE_VAL] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&csc_feature_uuid, ESP_GATT_PERM_READ,
-        GATTS_DEMO_CHAR_VAL_LEN_MAX, sizeof(csc_feature_value), (uint8_t*)csc_feature_value}},
-
-    // Sensor Location
-    [IDX_SENSOR_LOCATION] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
-        CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_read}},
-
-    // Sensor Location Value
-    [IDX_SENSOR_LOCATION_VAL] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&sensor_location_uuid, ESP_GATT_PERM_READ,
-        GATTS_DEMO_CHAR_VAL_LEN_MAX, sizeof(csc_sensor_location_value), (uint8_t*)csc_sensor_location_value}},
-
-    // SC Control Point
-    [IDX_CSC_SC_CONTROL_POINT] =
-        {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
-        CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_write}},
-
-    // SC Control Point Value
-    [IDX_CSC_SC_CONTROL_POINT_VAL] =
-        {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&sc_control_point_uuid, ESP_GATT_PERM_WRITE,
-        GATTS_DEMO_CHAR_VAL_LEN_MAX, 0, NULL}},
 };
+
+// static const esp_gatts_attr_db_t gatt_csc_db[CSC_IDX_NB] =
+// {
+//     // CSC Service
+//     [IDX_CSC_SVC] = {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&primary_service_uuid, ESP_GATT_PERM_READ,
+//         sizeof(uint16_t), sizeof(cycling_speed_cadence_svc_uuid), (uint8_t*)&cycling_speed_cadence_svc_uuid}},
+
+//         // CSC Measurement
+//     [IDX_CSC_MEASUREMENT] =
+//         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+//         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_notify}},
+
+//     // CSC Measurement Value
+//     [IDX_CSC_MEASUREMENT_VAL] =
+//         {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&csc_measurement_uuid, 0,
+//         GATTS_DEMO_CHAR_VAL_LEN_MAX, 0, NULL}},
+
+//     // CSC Measurement Config
+//     [IDX_CSC_MEASUREMENT_CFG] =
+//         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_client_config_uuid, ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+//         sizeof(uint16_t), sizeof(csc_measurement_ccc), (uint8_t*)csc_measurement_ccc}},
+
+//     /// CSC Feature
+//     [IDX_CSC_FEATURE] =
+//         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
+//         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_read}},
+
+//     // CSC Feature Value
+//     [IDX_CSC_FEATURE_VAL] =
+//         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&csc_feature_uuid, ESP_GATT_PERM_READ,
+//         GATTS_DEMO_CHAR_VAL_LEN_MAX, sizeof(csc_feature_value), (uint8_t*)csc_feature_value}},
+
+//     // Sensor Location
+//     [IDX_SENSOR_LOCATION] =
+//         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
+//         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_read}},
+
+//     // Sensor Location Value
+//     [IDX_SENSOR_LOCATION_VAL] =
+//         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&sensor_location_uuid, ESP_GATT_PERM_READ,
+//         GATTS_DEMO_CHAR_VAL_LEN_MAX, sizeof(csc_sensor_location_value), (uint8_t*)csc_sensor_location_value}},
+
+//     // SC Control Point
+//     [IDX_CSC_SC_CONTROL_POINT] =
+//         {{ESP_GATT_AUTO_RSP}, {ESP_UUID_LEN_16, (uint8_t*)&character_declaration_uuid, ESP_GATT_PERM_READ,
+//         CHAR_DECLARATION_SIZE, CHAR_DECLARATION_SIZE, (uint8_t*)&char_prop_write}},
+
+//     // SC Control Point Value
+//     [IDX_CSC_SC_CONTROL_POINT_VAL] =
+//         {{ESP_GATT_RSP_BY_APP}, {ESP_UUID_LEN_16, (uint8_t*)&sc_control_point_uuid, ESP_GATT_PERM_WRITE,
+//         GATTS_DEMO_CHAR_VAL_LEN_MAX, 0, NULL}},
+// };
 
 static const esp_gatts_attr_db_t gatt_hr_db[HR_IDX_NB] =
 {
@@ -584,7 +606,7 @@ void notify_ftms_rower_data(void* p)
             uint8_t stroke_rate = values.stroke_rate_x2;
             uint16_t stroke_count = values.stroke_count;
             uint8_t stroke_average = values.stroke_average;
-            uint32_t distance = values.distance;
+            unsigned int distance = values.distance;
             uint16_t pace = values.current_speed != 0 ? 500 * 100 / values.current_speed : 0;
             uint16_t power = values.power;
             uint16_t calories = values.calories;
@@ -645,7 +667,7 @@ void notify_ftms_indoor_bike_data(void* p)
             uint16_t speed = (uint16_t)(values.current_speed * 60 * 60 / 1000);
             ESP_LOGI(TAG, "bike speed %u cm/s, %0.1f km/h", values.current_speed, speed / 100.0f);
             uint8_t cadence = values.stroke_rate_x2;
-            uint32_t distance = values.distance;
+            unsigned int distance = values.distance;
             uint16_t power = values.power;
             uint16_t calories = values.calories;
             uint16_t cal_hour = 0xffff;
@@ -767,7 +789,7 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
             //     ESP_LOGE(TAG, "config raw scan rsp data failed, error code = %x", raw_scan_ret);
             // }
             // adv_config_done |= SCAN_RSP_CONFIG_FLAG;
-            ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_csc_db, gatts_if, CSC_IDX_NB, CSC_SVC_INST_ID));
+            //ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_csc_db, gatts_if, CSC_IDX_NB, CSC_SVC_INST_ID));
             ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_ftms_db, gatts_if, FTMS_IDX_NB, FTMS_SVC_INST_ID));
             ESP_ERROR_CHECK(esp_ble_gatts_create_attr_tab(gatt_hr_db, gatts_if, HR_IDX_NB, HR_SVC_INST_ID));
             break;
@@ -829,6 +851,10 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_
                     {
                         kill_notify_task(gatts_if, param->write.bda, param->write.conn_id, "notify_indoor_bike_data");
                     }
+                }
+                else if (driver->ftms_handle_table[IDX_FTMS_STATUS_CFG] == param->write.handle && param->write.len == 2)
+                {
+                    printf("status notify request!!!\n");
                 }
                 else
                 {

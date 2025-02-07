@@ -4,6 +4,8 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+#include "rom/ets_sys.h"
 #include "usb/usb_host.h"
 #include "driver/gpio.h"
 #include "led_strip.h"
@@ -478,7 +480,7 @@ static void s4_update_stroke_rate(s4_driver_t* driver)
 
 static void s4_set_value(s4_driver_t* driver, uint16_t address, uint32_t value)
 {
-    //ESP_LOGI(TAG, "Set [%03x] = %d", address, value);
+    ESP_LOGI(TAG, "Set [%03x] = %us", address, (unsigned int)value);
 
     s4_variable_t* var;
     s4_variable_t key = { .address = address };
@@ -578,13 +580,15 @@ static void s4_in_event(s4_driver_t* driver)
         driver->in_buffer[driver->in_buffer_size] = 0;
         if (driver->in_buffer[0] == 'I' && driver->in_buffer[1] == 'D')
         {
-            uint32_t offset;
+            //printf("(%u, %u) S4: %s\n", sizeof(uint32_t), sizeof(unsigned int), driver->in_buffer);
+            unsigned int offset;
             uint8_t size;
-            if (sscanf(driver->in_buffer, "ID%c%03X", &size, &offset) == 2)
+            int r;
+            if ((r = sscanf(driver->in_buffer, "ID%c%03X", &size, &offset)) == 2)
             {
                 if (size == S4_SINGLE_VALUE && driver->in_buffer_size == 8)
                 {
-                    uint32_t value;
+                    unsigned int value;
                     if (sscanf(driver->in_buffer + prefix_size, "%02X", &value) == 1)
                     {
                         s4_set_value(driver, offset, value);
@@ -592,8 +596,8 @@ static void s4_in_event(s4_driver_t* driver)
                 }
                 else if (size == S4_DOUBLE_VALUE && driver->in_buffer_size == 10)
                 {
-                    uint32_t high;
-                    uint32_t low;
+                    unsigned int high;
+                    unsigned int low;
                     if (sscanf(driver->in_buffer + prefix_size, "%02X%02X", &high, &low) == 2)
                     {
                         uint32_t value = high << 8 | low;
@@ -602,9 +606,9 @@ static void s4_in_event(s4_driver_t* driver)
                 }
                 else if (size == S4_TRIPLE_VALUE && driver->in_buffer_size == 12)
                 {
-                    uint32_t higher;
-                    uint32_t high;
-                    uint32_t low;
+                    unsigned int higher;
+                    unsigned int high;
+                    unsigned int low;
                     if (sscanf(driver->in_buffer + prefix_size, "%02X%02X%02X", &higher, &high, &low) == 3)
                     {
                         uint32_t value = higher << 16 | high << 8 | low;
@@ -612,6 +616,8 @@ static void s4_in_event(s4_driver_t* driver)
                     }
                 }
             }
+            //printf("s4 r: %d\n", r);
+
         }
     }
 

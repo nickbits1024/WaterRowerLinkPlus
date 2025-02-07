@@ -40,7 +40,7 @@
 #define ANTPLUS_RX_GPIO_NUM                 GPIO_NUM_16
 
 #define ANTPLUS_RESET_GPIO_NUM              GPIO_NUM_15
-#define ANTPLUS_RESET_GPIO_SEL              GPIO_SEL_15
+#define ANTPLUS_RESET_GPIO_SEL              (1ull << ANTPLUS_RESET_GPIO_NUM)
 
 #define ANTPLUS_SYNC_BYTE_MASK              0xfe
 #define ANTPLUS_SYNC_BYTE_VALUE             0xa4

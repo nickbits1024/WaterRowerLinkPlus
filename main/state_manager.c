@@ -3,6 +3,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "esp_system.h"
+#include "rom/ets_sys.h"
 #include "esp_log.h"
 #include "led_strip.h"
 #include "state_manager_int.h"
